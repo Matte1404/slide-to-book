@@ -1,0 +1,24 @@
+name: check
+
+# Valida la skill a ogni push e pull request: frontmatter accettato da claude.ai,
+# file citati presenti, script funzionanti sul corso di prova.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python: ["3.8", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install pyyaml pymupdf
+      - run: python evals/smoke_test.py

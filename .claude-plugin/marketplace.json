@@ -1,0 +1,21 @@
+{
+  "name": "slide-to-book",
+  "owner": {
+    "name": "Matte1404"
+  },
+  "metadata": {
+    "description": "Dispense complete in stile libro da slide, trascrizioni delle lezioni ed esami passati",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "slide-to-book",
+      "description": "Trasforma slide, trascrizioni delle lezioni ed esami passati in una dispensa completa, orientata all'esame e con citazioni verificabili",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./slide-to-book"
+      ]
+    }
+  ]
+}

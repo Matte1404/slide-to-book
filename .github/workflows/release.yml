@@ -1,0 +1,34 @@
+name: release
+
+# Con un tag (git tag v1.0.0 && git push origin v1.0.0) controlla la skill, crea la
+# release e allega slide-to-book.zip, pronto da caricare su claude.ai.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml pymupdf
+      - name: Controlla che il tag corrisponda alla versione
+        run: |
+          versione=$(python -c 'import json; print(json.load(open(".claude-plugin/marketplace.json"))["metadata"]["version"])')
+          test "${GITHUB_REF_NAME#v}" = "$versione" || { echo "tag $GITHUB_REF_NAME diverso dalla versione $versione"; exit 1; }
+      - name: Controlla la skill
+        run: python evals/smoke_test.py
+      - name: Crea lo zip
+        run: |
+          zip -r slide-to-book.zip slide-to-book -x '*.DS_Store' '*__pycache__*'
+          unzip -l slide-to-book.zip | grep -q " slide-to-book/SKILL.md$"
+      - name: Pubblica la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" slide-to-book.zip --title "$GITHUB_REF_NAME" --generate-notes

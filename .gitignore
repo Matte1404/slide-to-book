@@ -1,0 +1,54 @@
+# sistema
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# zip della skill: si crea con il comando nel README o con la release
+*.zip
+*.skill
+
+# materiale dei corsi e dispense generate: non vanno nel repository
+dispensa/
+_fonti/
+# cartelle di un corso, anche dentro una cartella di prova
+slide/
+slides/
+trascrizioni/
+registrazioni/
+sbobinature/
+esami/
+appelli/
+altro/
+capitoli/
+elenco.txt
+*.pdf
+*.pptx
+*.ppt
+*.key
+*.odp
+*.docx
+*.doc
+*.odt
+*.rtf
+*.srt
+*.vtt
+*.txt
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.mp3
+*.m4a
+*.wav
+*.ogg
+*.aac
+*.flac
+*.mp4
+*.mov
+*.webm
+*.mkv
+
+# area di prova della skill-creator (eval, corsi di prova, venv)
+*-workspace/

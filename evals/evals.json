@@ -1,0 +1,80 @@
+{
+  "skill_name": "slide-to-book",
+  "fixtures": "python3 evals/make_fixtures.py <cartella>: 2 PDF di slide (12 slide, la S01 5 è solo un diagramma), un DOCX con le trascrizioni di 2 lezioni, 2 esami in PDF. Con --cartelle: lo stesso corso in slide/, trascrizioni/ (una per lezione più un audio da trascrivere), esami/ (date nel nome e soluzioni ufficiali di giugno), altro/programma.pdf e un file fuori posto.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "chat-con-codice",
+      "prompt": "usa la skill slide-to-book. ti allego le slide delle prime due lezioni, le trascrizioni (sono tutte in un file) e due appelli dell'anno scorso. fammi il riassunto per prepararmi allo scritto",
+      "expected_output": "Una dispensa completa (Markdown e DOCX o PDF) nella cartella di output, con tutte le 12 slide spiegate e citate, le trascrizioni divise in T01 e T02, priorità ricavate da lezioni ed esami, tutti gli esercizi d'esame svolti, e un archivio di dispensa/ per riprendere il lavoro.",
+      "files": [
+        "lez01_sistemi.pdf",
+        "lez02_primo_ordine.pdf",
+        "trascrizioni_lezioni.docx",
+        "esame_2025-06-16.pdf",
+        "esame_2025-09-10.pdf"
+      ],
+      "assertions": [
+        "Il registro divide il file di trascrizioni in due lezioni, T01 e T02",
+        "Il controllo automatico (check_coverage.py) sulla dispensa finale termina senza errori: 12/12 slide coperte",
+        "La modalità d'esame è riconosciuta come scritto con esercizi, senza formulario, con citazione della lezione",
+        "La sezione sulla risposta al gradino è ⭐⭐⭐ con una riga 'Perché' che cita entrambi gli appelli e la lezione",
+        "Il tempo di salita (circa 2.2 τ) è marcato [FUORI SLIDE] e citato da T02",
+        "Il teorema di esistenza e unicità è marcato [ESCLUSO DAL DOCENTE] ma è comunque presente",
+        "Tutti e 5 gli esercizi d'esame compaiono con 'Dove l'hai visto' (nome del file, data dell'appello, numero)",
+        "Risultati numerici corretti: y(1) ≈ 1.73 e assestamento 2 s (E2025-06 es. 1); τ = 0.1 s e salita ≈ 0.22 s (E2025-06 es. 3); valore finale 10, y(4) ≈ 8.65, assestamento 8 s (E2025-09 es. 1)",
+        "Le soluzioni non ufficiali sono marcate [SOLUZIONE GENERATA]",
+        "La slide 5 di S01 (solo diagramma) ha una lettura visiva in _fonti/S01.md e il suo contenuto è spiegato",
+        "La logistica (orari di ricevimento) non compare come contenuto da studiare",
+        "Nella cartella di output ci sono la dispensa unita (Markdown più DOCX o PDF) e uno zip di dispensa/",
+        "Nessun messaggio che aspetta una risposta prima della consegna finale (la skill non si ferma a chiedere conferme)",
+        "Il PDF compilato mostra le stelle (★ o ⭐ nel testo estratto dal PDF)",
+        "merge_book.py, rieseguito sulla dispensa consegnata, non segnala caratteri mancanti",
+        "La dispensa consegnata ha un nome legato al corso (per esempio Corso-di-prova.pdf)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "solo-chat",
+      "prompt": "usa questa skill (te l'ho incollata sopra). ti mando slide, trascrizioni e due esami vecchi: fammi il riassunto per l'esame scritto",
+      "expected_output": "Con il solo SKILL.md e senza esecuzione di codice: un primo messaggio con registro, mappa e assunzioni, poi capitoli a puntate con citazioni [ID, posizione] e righe 'Copertura', e un controllo di copertura finale fatto a mano.",
+      "files": [
+        "lez01_sistemi.pdf",
+        "lez02_primo_ordine.pdf",
+        "trascrizioni_lezioni.docx",
+        "esame_2025-06-16.pdf",
+        "esame_2025-09-10.pdf"
+      ],
+      "assertions": [
+        "Il primo messaggio contiene registro e mappa dei capitoli e prosegue senza aspettare una conferma",
+        "Le trascrizioni sono divise in T01 e T02 e citate con i timestamp del file",
+        "Ogni capitolo numerato (01, 02, ...) termina con una riga 'Copertura' in testo semplice",
+        "Il controllo finale riporta S01: 6/6 e S02: 6/6 slide",
+        "Le stelle seguono le regole riassunte in SKILL.md, con riga 'Perché' e citazioni",
+        "Tutti e 5 gli esercizi d'esame sono svolti, con 'Dove l'hai visto' e lo stato della soluzione",
+        "Risultati numerici corretti: y(1) ≈ 1.73 e assestamento 2 s (E2025-06 es. 1); τ = 0.1 s e salita ≈ 0.22 s (E2025-06 es. 3); valore finale 10, y(4) ≈ 8.65, assestamento 8 s (E2025-09 es. 1)",
+        "Ogni risposta ha una lunghezza ragionevole per un messaggio di chat"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "cartelle-claude-code",
+      "prompt": "usa la skill slide-to-book su questo corso: fammi la dispensa per prepararmi allo scritto",
+      "expected_output": "In Claude Code, dentro la cartella del corso (slide/, trascrizioni/, esami/, altro/): fonti registrate dalle cartelle con ID corretti, audio e file fuori posto segnalati, soluzioni ufficiali e programma usati, dispensa completa compilata in dispensa/.",
+      "files": [
+        "evals/make_fixtures.py --cartelle"
+      ],
+      "assertions": [
+        "Gli ID delle fonti sono S01, S02, T01, T02, E2025-06, E2025-06-sol, E2025-09, X01, ricavati dalle cartelle",
+        "La registrazione lezione03.m4a è segnalata all'utente come da trascrivere",
+        "Il file fuori posto note_varie.txt è stato considerato e non entra nella dispensa come contenuto",
+        "Gli esercizi di giugno 2025 usano le soluzioni ufficiali (citazioni a E2025-06-sol), non [SOLUZIONE GENERATA]",
+        "La modalità d'esame cita il programma del corso (X01), compreso l'orale facoltativo",
+        "Il controllo automatico (check_coverage.py) termina senza errori: 12/12 slide coperte",
+        "Il PDF compilato mostra le stelle e la dispensa ha il nome del corso",
+        "Nei file consegnati non ci sono domande rivolte all'utente né parti lasciate da completare",
+        "Risultati numerici corretti: y(1) ≈ 1.73 e assestamento 2 s (E2025-06 es. 1); τ = 0.1 s e salita ≈ 0.22 s (E2025-06 es. 3); valore finale 10, y(4) ≈ 8.65, assestamento 8 s (E2025-09 es. 1)"
+      ]
+    }
+  ]
+}
