@@ -2,7 +2,7 @@
 
 Una skill per Claude (e per altri assistenti) che trasforma il materiale di un corso universitario in una **dispensa completa in stile libro**, orientata all'esame:
 
-- **completa come le slide**: ogni slide è spiegata, e un controllo automatico verifica che nessuna manchi;
+- **completa come le slide**: ogni slide è spiegata, e un controllo automatico verifica che ognuna sia citata e segnala quelle citate solo dentro intervalli ampi;
 - **spiegata come a lezione**: usa le trascrizioni per riportare spiegazioni, esempi ed enfasi del docente;
 - **orientata all'esame**: priorità ⭐/⭐⭐/⭐⭐⭐ ricavate da ciò che il docente ha sottolineato e da ciò che è uscito negli appelli passati, esercizi d'esame svolti, domande di autoverifica nella forma dell'esame (scritto, orale, quiz, progetto);
 - **verificabile**: ogni affermazione ha una citazione come `[S03, slide 14]`, `[T05, 00:42:10]` o `[E2024-02, es. 1]`, così sai sempre dove l'hai visto.

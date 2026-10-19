@@ -24,8 +24,11 @@ Lancialo anche durante la scrittura, dopo ogni capitolo: trova subito citazioni 
 - esami mai citati.
 
 **Avvisi** (da valutare caso per caso):
+- slide coperte solo da citazioni a più di 4 slide distinte, come `[S01, slide 1-45]`: lo script le conta come coperte, ma una citazione così non dice se ognuna è spiegata. Le citazioni nella stessa parentesi o in parentesi attaccate (`[S01, slide 1-4]; [S01, slide 5-8]`) contano insieme; i passi di un'animazione Beamer (pagine che ripetono la precedente aggiungendo righe) contano come una slide sola; le citazioni nella sezione "Slide di servizio" non contano come intervalli ampi;
+- più di 3 slide con del testo, e più di un quarto del file, coperte solo dalla sezione "Slide di servizio". Titoli brevi, "Domande?", "Grazie" e divisori di sezione hanno poco testo e non contano, e nemmeno gli indici ripetuti a ogni sezione;
 - paragrafi che affermano che qualcosa è stato detto a lezione o è uscito all'esame senza citare una fonte `T`, `E` o `X`;
-- segmenti delle trascrizioni mai citati. Spesso è logistica, ma controlla di non aver perso una spiegazione o un esempio.
+- segmenti delle trascrizioni mai citati. Spesso è logistica, ma controlla di non aver perso una spiegazione o un esempio;
+- esercizi citati nel libro (`[E2024-02, es. 3]`) che non sono nel catalogo `esercizi.md`: il numero può essere sbagliato, perché lo script non legge il testo dell'esame.
 
 Con `--copertura` scrive la tabella slide → sezione che spiega la slide (le sezioni di riepilogo come "Errori comuni" compaiono solo se la slide non è spiegata altrove). Con `--tag-report` scrive l'appendice dei punti da verificare, raggruppati per tipo e con la sezione in cui compaiono.
 
@@ -39,6 +42,7 @@ deve rispondere che non ci sono slide segnalate senza lettura visiva. Per una sl
 
 ## 2. Correzione
 
+- **Slide coperte solo da intervalli ampi**: apri quelle slide in `_fonti/` e verifica che ogni punto sia spiegato. Poi sostituisci l'intervallo con citazioni vicine al testo che spiega ciascuna slide (`[S01, slide 14]`, `[S01, slide 15-16]`). Non spezzare l'intervallo solo per far sparire l'avviso.
 - **Slide non citata**: non aggiungere una citazione solo per far passare il controllo. Apri la slide in `_fonti/`, verifica se il suo contenuto è davvero spiegato. Se non lo è, scrivilo nella sezione giusta. Se è una slide di servizio, aggiungila all'elenco delle slide di servizio nelle appendici.
 - **Citazione sbagliata**: trova la posizione giusta nelle intestazioni di `_fonti/` e correggila. Se la fonte non dice quella cosa, la frase va riscritta o marcata.
 - **Citazione malformata**: dentro le parentesi solo ID e posizione; i commenti vanno fuori.

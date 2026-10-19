@@ -11,8 +11,13 @@ Errori (codice di uscita 1):
   - esercizi del catalogo (--esercizi) mai citati nel libro
   - esami (fonti E) mai citati
 Avvisi:
+  - slide coperte solo da citazioni a intervalli ampi (più di 4 slide distinte nella stessa parentesi
+    o in parentesi attaccate, contando come una i passi di un'animazione Beamer), che non dicono se
+    ogni slide è spiegata
+  - molte slide con del testo coperte solo dalla sezione "Slide di servizio"
   - paragrafi che parlano di lezione, docente o esame senza citare una fonte T o E
   - segmenti delle trascrizioni mai citati
+  - esercizi citati nel libro ma assenti dal catalogo (--esercizi)
 Stampa l'inventario dei tag; con --copertura scrive la tabella slide -> sezione
 (senza parentesi quadre, così non conta come citazione).
 
@@ -25,7 +30,7 @@ import bisect
 import json
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 BRACKET = re.compile(r"\[([^\[\]\n]{3,400})\](?!\()")
@@ -33,7 +38,8 @@ ID_PART = re.compile(r"^\s*([STEX][0-9][0-9A-Za-z-]*)\s*(?:,\s*(.*?))?\s*$")
 TS = r"\d{1,2}:\d{2}(?::\d{2})?"
 POS_TS = re.compile(r"^(" + TS + r")(?:\s*[-–—]\s*(" + TS + r"))?$")
 POS_UNIT = re.compile(r"^(slides?|pag(?:\.|ina|ine|g\.)?|pp?\.|par(?:\.|agrafo|agrafi)?)\s*(.+)$", re.I)
-POS_EX = re.compile(r"^(?:es(?:\.|ercizio|ercizi)?|domanda|dom\.|quesito|q\.)\s*(.+)$", re.I)
+# una parola chiave intera ("esempio 3" non è l'esercizio "empio 3") o un'abbreviazione col punto ("dom.A")
+POS_EX = re.compile(r"^(?:(?:es|dom|q)\.|(?:es(?:ercizi[oi]?)?|domand[ae]|quesit[oi])(?![^\W\d_]))\s*(.+)$", re.I)
 TAGS = ["INTEGRAZIONE", "DA VERIFICARE", "DISCREPANZA", "FUORI SLIDE",
         "SOLUZIONE GENERATA", "ESCLUSO DAL DOCENTE"]
 TAG_RE = re.compile(r"\[(" + "|".join(TAGS) + r")\b[^\]]*\]")
@@ -43,6 +49,12 @@ CLAIM = re.compile(r"(?i)(\b(?:detto|spiegato|sottolineato|ripetuto|visto|svolto
                    r"(?:detto|sottolineato|insistito|ripetuto|spiegato|raccomandato|chiesto|avvertito)\b|"
                    r"\b(?:uscit|chiest)[oaie]\s+(?:all['’]|agli\s+|in\s+|nell['’]|negli\s+)(?:esam|appell))")
 TE_CITE = re.compile(r"\[[^\]]*\b[TEX][0-9][0-9A-Za-z-]*\s*,")
+# una citazione che copre più slide distinte di così non dice quale slide spiega quale frase
+WIDE = 4
+SERVICE = "slide di servizio"  # titolo della sezione delle appendici con titoli, indici, ringraziamenti
+VISUAL = "(lettura visiva)"    # le note aggiunte da visual.py note
+ADJACENT = re.compile(r"(?:[\s;,.:·–—-]|\b(?:e|ed|o)\b)*", re.I)  # fra due citazioni che vanno lette insieme
+LOW_TEXT = 40                  # caratteri sotto cui una slide è quasi vuota (come in extract_sources.py)
 
 
 def strip_code(text):
@@ -118,6 +130,16 @@ def norm_ex(label):
     return re.sub(r"[\s.]", "", label.lower())
 
 
+def ex_number(label):
+    """Numero dell'esercizio senza la lettera della parte: "2b" -> "2"."""
+    return re.sub(r"(?<=\d)[a-z]+$", "", label)
+
+
+def natural(loc):
+    """Ordine "01.md:9" prima di "01.md:12"."""
+    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", loc)]
+
+
 def book_files(path):
     p = Path(path)
     if p.is_file():
@@ -129,6 +151,43 @@ def book_files(path):
 def unit_numbers(info):
     """Numero di unità per fonti con numerazione (slide/pag/par)."""
     return len(info["labels"])
+
+
+def slide_texts(fonti, sid):
+    """Righe di testo di ogni slide (indici da 0) in _fonti/<ID>.md, senza gli avvisi dello script."""
+    try:  # è solo per gli avvisi: un file illeggibile non deve fermare il controllo
+        text = (Path(fonti) / (sid + ".md")).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    pages = {}
+    for m in re.finditer(r"(?ms)^## \[%s, slide (\d+)\]\n(.*?)(?=^## \[|\Z)" % re.escape(sid), text):
+        pages[int(m.group(1)) - 1] = [l.strip() for l in m.group(2).split("\n") if l.strip()
+                                      and not l.startswith("⚠") and l.strip() != "(nessun testo estratto)"]
+    return pages
+
+
+def extracted(lines):
+    """Il testo estratto dalla slide, senza le letture visive aggiunte dopo."""
+    return " ".join(l for l in lines if not l.startswith(VISUAL))
+
+
+def overlay_steps(pages):
+    """Slide che ripetono la precedente aggiungendo qualcosa, come i passi di un'animazione Beamer:
+    gli indici i per cui ogni parola della slide i-1 compare anche nella slide i (un \\pause dentro
+    una riga allunga la riga invece di aggiungerne una). Una citazione a tutti i passi di
+    un'animazione riguarda una slide sola, non un intervallo. Le letture visive non contano, perché
+    ogni passo può averne una sua; per questo due slide quasi vuote con lo stesso titolo (due
+    immagini diverse) contano come passi solo se la seconda aggiunge qualcosa."""
+    words = {i: Counter(re.findall(r"\w+", extracted(ls).lower())) for i, ls in pages.items()}
+    return {i for i in words if words.get(i - 1) and not words[i - 1] - words[i]
+            and (sum(words[i].values()) > sum(words[i - 1].values())
+                 or len(re.sub(r"\s", "", extracted(pages[i]))) >= LOW_TEXT)}
+
+
+def distinct_slides(idxs, steps):
+    """Slide distinte in una citazione: i passi di un'animazione contano con la slide da cui partono."""
+    s = set(idxs)
+    return sum(1 for i in s if not (i in steps and i - 1 in s))
 
 
 def check_citation(src_id, pos, index, where, errors):
@@ -198,16 +257,30 @@ def check_citation(src_id, pos, index, where, errors):
 
 
 def scan(files, index, errors):
-    """Restituisce citazioni trovate: lista di (id, tipo, valore, file, riga, titolo)."""
+    """Restituisce citazioni trovate: lista di (id, tipo, valore, file, riga, titolo, gruppo, servizio).
+    Il gruppo riunisce le citazioni nella stessa parentesi o in parentesi separate solo da
+    punteggiatura o da "e" ("[S01, slide 1-4]; [S01, slide 5-8]"): insieme sostengono la stessa frase.
+    servizio dice se la citazione sta nella sezione "Slide di servizio", anche sotto un suo sottotitolo."""
     cites = []
     for f in files:
         raw = f.read_text(encoding="utf-8-sig")
         raw_lines = raw.split("\n")
         text = strip_code(raw)
         heading = f.stem
+        service_level = 0
         for lineno, line in enumerate(text.split("\n"), 1):
             heading = heading_of(raw_lines[lineno - 1], line, heading)
+            hm = re.match(r"^\s{0,3}(#{1,6})\s+(.*)", raw_lines[lineno - 1]) if line.strip() else None
+            if hm:  # la sezione delle slide di servizio finisce al titolo successivo dello stesso livello
+                if service_level and len(hm.group(1)) <= service_level:
+                    service_level = 0
+                if not service_level and SERVICE in hm.group(2).lower():
+                    service_level = len(hm.group(1))
+            group, end = 0, None
             for bm in BRACKET.finditer(line):
+                if end is None or not ADJACENT.fullmatch(line[end:bm.start()]):
+                    group += 1
+                end = bm.end()
                 for part in bm.group(1).split(";"):
                     pm = ID_PART.match(part)
                     where = "%s:%d" % (f.name, lineno)
@@ -218,7 +291,8 @@ def scan(files, index, errors):
                         continue
                     res = check_citation(pm.group(1), (pm.group(2) or "").strip(), index, where, errors)
                     if res:
-                        cites.append((pm.group(1), res[0], res[1], f, lineno, heading))
+                        cites.append((pm.group(1), res[0], res[1], f, lineno, heading, (f, lineno, group),
+                                      bool(service_level)))
     return cites
 
 
@@ -356,13 +430,32 @@ def main():
 
     covered = defaultdict(set)
     covered_at = defaultdict(lambda: defaultdict(list))
-    exercises_cited = set()
+    exercises_cited = {}  # (ID, esercizio) -> prima posizione nel libro
     cited_ids = set()
-    for sid, kind, value, f, lineno, heading in cites:
+    pages, steps = {}, {}
+    precise = defaultdict(set)    # slide con almeno una citazione mirata, cioè non a intervallo ampio
+    service = defaultdict(set)    # slide citate nella sezione delle slide di servizio
+    wide_at = defaultdict(list)   # citazioni a intervallo ampio: (posizione, slide)
+    together = defaultdict(set)   # (gruppo, ID) -> slide citate insieme
+    for sid, kind, value, f, lineno, heading, group, in_service in cites:
+        if kind == "idx" and sid.startswith("S") and not in_service:
+            together[(group, sid)].update(value)
+    for sid, kind, value, f, lineno, heading, group, in_service in cites:
         cited_ids.add(sid)
         if kind == "es":
-            exercises_cited.add((sid, value))
+            exercises_cited.setdefault((sid, value), "%s:%d" % (f.name, lineno))
             continue
+        if sid.startswith("S"):
+            if in_service:
+                service[sid].update(value)
+            else:
+                if sid not in steps:
+                    pages[sid] = slide_texts(args.fonti, sid)
+                    steps[sid] = overlay_steps(pages[sid])
+                if distinct_slides(together[(group, sid)], steps[sid]) > WIDE:
+                    wide_at[sid].append(("%s:%d" % (f.name, lineno), set(value)))
+                else:
+                    precise[sid].update(value)
         for i in value:
             covered[sid].add(i)
             loc = "%s › %s" % (f.stem, heading) if heading != f.stem else f.stem
@@ -381,8 +474,30 @@ def main():
             if missing:
                 errors.append("%s (%s): %s mai citate: %s" % (sid, Path(info["file"]).name,
                               info["labels"][0].rsplit(" ", 1)[0], compress(missing)))
-            report.append("%s: %d/%d %s coperte (%.0f%%)" % (sid, n - len(missing), n,
-                          info["labels"][0].rsplit(" ", 1)[0], 100.0 * (n - len(missing)) / n))
+            unit = info["labels"][0].rsplit(" ", 1)[0]
+            only_wide = sorted(got - precise[sid] - service[sid])
+            # titoli, "Grazie", divisori di sezione hanno poco testo, e gli indici ripetuti a ogni sezione
+            # hanno le stesse righe: conta solo le slide con del testo che non sta in altre slide di servizio
+            texts = pages[sid] if sid in pages else slide_texts(args.fonti, sid)
+            own = {i: {l for l in texts.get(i, []) if not l.startswith(VISUAL)} for i in service[sid]}
+            only_service = sorted(i for i in service[sid] - precise[sid]
+                                  if len(re.sub(r"\s", "", extracted(texts.get(i, [])))) >= LOW_TEXT
+                                  and own[i] - set().union(*[own[j] for j in own if j != i]))
+            report.append("%s: %d/%d %s coperte (%.0f%%)%s" % (sid, n - len(missing), n, unit,
+                          100.0 * (n - len(missing)) / n,
+                          ", %d solo da intervalli ampi" % len(only_wide) if only_wide else ""))
+            if only_wide:  # solo le citazioni che contengono le slide segnalate, una volta ciascuna
+                places = sorted({loc for loc, idxs in wide_at[sid] if idxs & set(only_wide)}, key=natural)
+                one = len(only_wide) == 1
+                warnings.append("%s: %s %s %s solo da citazioni a più di %d slide (%s%s): controlla che %s"
+                                % (sid, unit, compress([i + 1 for i in only_wide]), "coperta" if one else "coperte",
+                                   WIDE, ", ".join(places[:3]), " …" if len(places) > 3 else "",
+                                   "sia spiegata e citala vicino al testo che la spiega" if one else
+                                   "ognuna sia spiegata e citale vicino al testo che le spiega"))
+            if len(only_service) > max(3, 0.25 * n):
+                warnings.append("%s: %d %s su %d, con del testo, coperte solo da «Slide di servizio» (%s): "
+                                "controlla che non abbiano contenuto da spiegare"
+                                % (sid, len(only_service), unit, n, compress([i + 1 for i in only_service])))
         elif sid.startswith("T"):
             missing = [i for i in range(n) if i not in got]
             report.append("%s: %d/%d segmenti citati (%.0f%%)" % (sid, n - len(missing), n,
@@ -399,10 +514,17 @@ def main():
             errors.append("catalogo esercizi non trovato: %s" % ex_path)
         else:
             catalog = scan([ex_path], index, errors)
-            for sid, kind, value, f, lineno, heading in catalog:
+            for sid, kind, value, f, lineno, heading, _, _ in catalog:
                 if kind == "es" and in_scope(sid) and (sid, value) not in exercises_cited:
                     errors.append("%s:%d esercizio [%s, es. %s] non compare nel libro"
                                   % (ex_path.name, lineno, sid, value))
+            # lo script non può leggere il numero di un esercizio nel PDF, ma può confrontarlo con il catalogo
+            # "es. 1a" e "es. 2c" sono parti degli esercizi 1 e 2; le soluzioni non sono nel catalogo
+            listed = {(sid, ex_number(value)) for sid, kind, value, _, _, _, _, _ in catalog if kind == "es"}
+            for (sid, value), where in sorted(exercises_cited.items()):
+                if in_scope(sid) and not re.search(r"-sol\d*$", sid) and (sid, ex_number(value)) not in listed:
+                    warnings.append("%s esercizio [%s, es. %s] citato ma assente da %s: controlla il numero "
+                                    "sul testo dell'esame o aggiungilo al catalogo" % (where, sid, value, ex_path.name))
 
     warnings += claims_without_source(files)
     inv = tag_inventory(files)

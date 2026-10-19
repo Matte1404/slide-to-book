@@ -51,7 +51,7 @@ Formato: `[ID, posizione]`. Più fonti nella stessa parentesi si separano con `;
 - esame: `[E2023-06, es. 2b]`, oppure `[E2023-06, pag. 3]` se l'esercizio non è numerato
 - altro: `[X01, pag. 4]`
 
-Usa esattamente le posizioni che compaiono nelle intestazioni dei file in `_fonti/`: lo script verifica che ogni slide, pagina, paragrafo o minuto citato esista. Il numero di un esercizio (`es. 2b`) non può verificarlo: controllalo tu sul testo dell'esame. Dentro le parentesi vanno solo ID e posizione: un commento come `[S01, slide 3 per i primi due]` non è una citazione valida, scrivilo fuori. Metti la citazione alla fine della frase o del paragrafo che sostiene, non in fondo al capitolo: serve anche a ritrovare la slide originale mentre si studia. Per gli esercizi scrivi anche, per esteso, nome del file e data dell'appello (formato in `references/chapter-template.md`), perché è quello che lo studente vuole aprire.
+Usa esattamente le posizioni che compaiono nelle intestazioni dei file in `_fonti/`: lo script verifica che ogni slide, pagina, paragrafo o minuto citato esista. Il numero di un esercizio (`es. 2b`) lo confronta solo con il catalogo `esercizi.md`, e senza la lettera della parte: controllalo tu sul testo dell'esame. Dentro le parentesi vanno solo ID e posizione: un commento come `[S01, slide 3 per i primi due]` non è una citazione valida, scrivilo fuori. Metti la citazione alla fine della frase o del paragrafo che sostiene, non in fondo al capitolo: serve anche a ritrovare la slide originale mentre si studia. Per gli esercizi scrivi anche, per esteso, nome del file e data dell'appello (formato in `references/chapter-template.md`), perché è quello che lo studente vuole aprire.
 
 ### Stile
 
