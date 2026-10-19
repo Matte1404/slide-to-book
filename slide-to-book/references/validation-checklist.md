@@ -13,7 +13,7 @@ python3 <skill>/scripts/check_coverage.py \
     --tag-report dispensa/punti-da-verificare.md
 ```
 
-Se consegni solo una parte del corso, aggiungi `--solo` con gli ID delle fonti di quella parte, separati da virgola, per esempio `--solo S01,S02,S03,T01,T02,T03,E2024-02`: le fonti delle parti non ancora scritte non contano come errori, gli esercizi del catalogo vengono controllati solo per quelle fonti, e la tabella di copertura contiene solo quelle. Il confronto è per prefisso (`S1` include anche S10–S19); un valore che non corrisponde a nessun ID è un errore. Controlla che nella sezione COPERTURA dell'output compaiano esattamente le fonti che ti aspetti.
+Se consegni solo una parte del corso, aggiungi `--solo` con gli ID delle fonti di quella parte, separati da virgola, per esempio `--solo S01,S02,S03,T01,T02,T03,E2024-02`: le fonti delle parti non ancora scritte non contano come errori, gli esercizi del catalogo vengono controllati solo per quelle fonti, e la tabella di copertura contiene solo quelle. Un valore vale per l'ID uguale e per quelli che lo continuano senza un'altra cifra: `S1` include `S1-01` e `S1-02` ma non `S10`, `E2024-02` include `E2024-02a` e `E2024-02-sol`, una lettera da sola (`E`) o un valore che finisce con un trattino (`S1-`) vale come prefisso. Un valore che non corrisponde a nessun ID è un errore. Controlla che nella sezione COPERTURA dell'output compaiano esattamente le fonti che ti aspetti.
 
 Lancialo anche durante la scrittura, dopo ogni capitolo: trova subito citazioni sbagliate o malformate, quando correggerle costa poco.
 
@@ -24,7 +24,7 @@ Lancialo anche durante la scrittura, dopo ogni capitolo: trova subito citazioni 
 - esami mai citati.
 
 **Avvisi** (da valutare caso per caso):
-- slide coperte solo da citazioni a più di 4 slide distinte, come `[S01, slide 1-45]`: lo script le conta come coperte, ma una citazione così non dice se ognuna è spiegata. Le citazioni nella stessa parentesi o in parentesi attaccate (`[S01, slide 1-4]; [S01, slide 5-8]`) contano insieme; i passi di un'animazione Beamer (pagine che ripetono la precedente aggiungendo righe) contano come una slide sola; le citazioni nella sezione "Slide di servizio" non contano come intervalli ampi;
+- slide non spiegate da una citazione mirata: coperte solo da citazioni a più di 4 slide distinte, come `[S01, slide 1-45]`, da citazioni con pochissimo testo intorno, come `Uno [S01, slide 1]. Due [S01, slide 2].` (meno di 5 parole per slide, sommando tutte le citazioni della slide; una formula vale tre parole, un blocco di codice una per riga; una frase che finisce con la citazione e i due punti prende anche l'elenco, la tabella, la formula o il codice che segue), oppure solo da riepiloghi ("In breve", "Formule e notazione", "Concetti chiave", "Errori comuni", "Domande di autoverifica", "Collegamenti", "Prerequisiti") e dalle voci di "Dove l'hai visto". Lo script le conta come coperte, ma queste citazioni non dicono se ognuna è spiegata. La riga `DOMANDA DEL DOCENTE` sotto un titolo vale come spiegazione. Le citazioni nella stessa parentesi o in parentesi attaccate (`[S01, slide 1-4]; [S01, slide 5-8]`) contano insieme; i passi di un'animazione Beamer (pagine che ripetono la precedente aggiungendo righe) contano come una slide sola; le citazioni nella sezione "Slide di servizio" non contano come intervalli ampi;
 - più di 3 slide con del testo, e più di un quarto del file, coperte solo dalla sezione "Slide di servizio". Titoli brevi, "Domande?", "Grazie" e divisori di sezione hanno poco testo e non contano, e nemmeno gli indici ripetuti a ogni sezione;
 - paragrafi che affermano che qualcosa è stato detto a lezione o è uscito all'esame senza citare una fonte `T`, `E` o `X`;
 - segmenti delle trascrizioni mai citati. Spesso è logistica, ma controlla di non aver perso una spiegazione o un esempio;
@@ -42,7 +42,7 @@ deve rispondere che non ci sono slide segnalate senza lettura visiva. Per una sl
 
 ## 2. Correzione
 
-- **Slide coperte solo da intervalli ampi**: apri quelle slide in `_fonti/` e verifica che ogni punto sia spiegato. Poi sostituisci l'intervallo con citazioni vicine al testo che spiega ciascuna slide (`[S01, slide 14]`, `[S01, slide 15-16]`). Non spezzare l'intervallo solo per far sparire l'avviso.
+- **Slide coperte solo da intervalli ampi o da citazioni con poco testo**: apri quelle slide in `_fonti/` e verifica che ogni punto sia spiegato. Poi sostituisci l'intervallo con citazioni vicine al testo che spiega ciascuna slide (`[S01, slide 14]`, `[S01, slide 15-16]`), e dove il testo è troppo breve spiega davvero la slide. Non spezzare l'intervallo, non aggiungere righe vuote e non allungare le frasi solo per far sparire l'avviso.
 - **Slide non citata**: non aggiungere una citazione solo per far passare il controllo. Apri la slide in `_fonti/`, verifica se il suo contenuto è davvero spiegato. Se non lo è, scrivilo nella sezione giusta. Se è una slide di servizio, aggiungila all'elenco delle slide di servizio nelle appendici.
 - **Citazione sbagliata**: trova la posizione giusta nelle intestazioni di `_fonti/` e correggila. Se la fonte non dice quella cosa, la frase va riscritta o marcata.
 - **Citazione malformata**: dentro le parentesi solo ID e posizione; i commenti vanno fuori.

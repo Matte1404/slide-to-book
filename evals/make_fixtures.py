@@ -4,6 +4,7 @@
 Uso:
     python3 evals/make_fixtures.py <cartella>              # tutti i file in una cartella
     python3 evals/make_fixtures.py --cartelle <cartella>   # slide/, trascrizioni/, esami/, altro/
+    python3 evals/make_fixtures.py --pptx <file.pptx>      # una presentazione PPTX di prova
 
 Senza --cartelle scrive due PDF di slide (12 slide in tutto, una solo-diagramma), le
 trascrizioni di due lezioni nello stesso file (DOCX e, uguale, TXT) e due esami in PDF:
@@ -148,6 +149,67 @@ def write_docx(path, paragraphs):
         z.writestr("word/document.xml", doc)
 
 
+P_NS = ('xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+
+
+def sp(paras, ph=None):
+    """Una forma con testo: paras è una lista di (livello, testo)."""
+    nv = '<p:nvPr><p:ph type="%s"/></p:nvPr>' % ph if ph else "<p:nvPr/>"
+    body = "".join('<a:p><a:pPr lvl="%d"/><a:r><a:t>%s</a:t></a:r></a:p>' % (lvl, txt) for lvl, txt in paras)
+    return ('<p:sp><p:nvSpPr><p:cNvPr id="2" name="t"/><p:cNvSpPr/>%s</p:nvSpPr><p:spPr/>'
+            '<p:txBody><a:bodyPr/>%s</p:txBody></p:sp>' % (nv, body))
+
+
+def table(rows):
+    cells = "".join("<a:tr>%s</a:tr>" % "".join("<a:tc><a:txBody><a:p><a:r><a:t>%s</a:t></a:r></a:p></a:txBody></a:tc>"
+                                                 % c for c in row) for row in rows)
+    return ('<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="3" name="tab"/><p:cNvGraphicFramePr/><p:nvPr/>'
+            '</p:nvGraphicFramePr><a:graphic><a:graphicData><a:tbl>%s</a:tbl></a:graphicData></a:graphic>'
+            '</p:graphicFrame>' % cells)
+
+
+def write_pptx(path):
+    """Quattro slide che coprono i casi dell'estrazione PPTX: titolo ed elenco a due livelli con note del
+    relatore, tabella, forme raggruppate in una slide nascosta, una slide con solo un'immagine."""
+    slides = [
+        (sp([(0, "Sistemi del secondo ordine")], "title")
+         + sp([(0, "Pulsazione naturale e smorzamento"), (1, "smorzamento minore di 1: risposta oscillante")]),
+         "Il docente: la sovraelongazione esce sempre allo scritto", ""),
+        (sp([(0, "Smorzamento e sovraelongazione")], "title")
+         + table([["smorzamento", "sovraelongazione"], ["0,5", "16%"], ["0,7", "5%"]]), None, ""),
+        ('<p:grpSp><p:nvGrpSpPr><p:cNvPr id="4" name="g"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>'
+         + sp([(0, "Testo dentro un gruppo, in una slide nascosta del file originale")]) + "</p:grpSp>",
+         None, ' show="0"'),
+        ('<p:pic><p:nvPicPr><p:cNvPr id="5" name="img"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill/>'
+         '<p:spPr/></p:pic>', None, ""),
+    ]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml",
+                   '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/'
+                   'content-types"><Default Extension="xml" ContentType="application/xml"/><Default Extension="rels" '
+                   'ContentType="application/vnd.openxmlformats-package.relationships+xml"/></Types>')
+        z.writestr("_rels/.rels", '<Relationships xmlns="%s"><Relationship Id="rId1" Type="%sofficeDocument" '
+                   'Target="ppt/presentation.xml"/></Relationships>' % (REL_NS, REL_TYPE))
+        ids = "".join('<p:sldId id="%d" r:id="rId%d"/>' % (256 + k, k) for k in range(1, len(slides) + 1))
+        z.writestr("ppt/presentation.xml", "<p:presentation %s><p:sldIdLst>%s</p:sldIdLst></p:presentation>" % (P_NS, ids))
+        z.writestr("ppt/_rels/presentation.xml.rels", '<Relationships xmlns="%s">%s</Relationships>' % (REL_NS, "".join(
+            '<Relationship Id="rId%d" Type="%sslide" Target="slides/slide%d.xml"/>' % (k, REL_TYPE, k)
+            for k in range(1, len(slides) + 1))))
+        for k, (shapes, notes, show) in enumerate(slides, 1):
+            z.writestr("ppt/slides/slide%d.xml" % k, "<p:sld %s%s><p:cSld><p:spTree>%s</p:spTree></p:cSld></p:sld>"
+                       % (P_NS, show, shapes))
+            if notes:
+                z.writestr("ppt/slides/_rels/slide%d.xml.rels" % k, '<Relationships xmlns="%s"><Relationship Id="rId1" '
+                           'Type="%snotesSlide" Target="../notesSlides/notesSlide%d.xml"/></Relationships>'
+                           % (REL_NS, REL_TYPE, k))
+                z.writestr("ppt/notesSlides/notesSlide%d.xml" % k, "<p:notes %s><p:cSld><p:spTree>%s%s</p:spTree>"
+                           "</p:cSld></p:notes>" % (P_NS, sp([(0, "1")], "sldNum"), sp([(0, notes)], "body")))
+
+
 SOLUTIONS = (
     "Corso di prova — Appello del 16 giugno 2025 — Soluzioni",
     [
@@ -201,6 +263,10 @@ def write_folders(out):
 
 def main():
     args = sys.argv[1:]
+    if args[:1] == ["--pptx"] and len(args) == 2:
+        write_pptx(Path(args[1]))
+        print("Presentazione di prova scritta in %s" % args[1])
+        return
     folders = "--cartelle" in args
     args = [a for a in args if a != "--cartelle"]
     if len(args) != 1:

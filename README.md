@@ -2,7 +2,7 @@
 
 Una skill per Claude (e per altri assistenti) che trasforma il materiale di un corso universitario in una **dispensa completa in stile libro**, orientata all'esame:
 
-- **completa come le slide**: ogni slide è spiegata, e un controllo automatico verifica che ognuna sia citata e segnala quelle citate solo dentro intervalli ampi;
+- **completa come le slide**: ogni slide è spiegata, e un controllo automatico verifica che ognuna sia citata e segnala quelle citate solo dentro intervalli ampi o con pochissimo testo intorno;
 - **spiegata come a lezione**: usa le trascrizioni per riportare spiegazioni, esempi ed enfasi del docente;
 - **orientata all'esame**: priorità ⭐/⭐⭐/⭐⭐⭐ ricavate da ciò che il docente ha sottolineato e da ciò che è uscito negli appelli passati, esercizi d'esame svolti, domande di autoverifica nella forma dell'esame (scritto, orale, quiz, progetto);
 - **verificabile**: ogni affermazione ha una citazione come `[S03, slide 14]`, `[T05, 00:42:10]` o `[E2024-02, es. 1]`, così sai sempre dove l'hai visto.
@@ -118,9 +118,9 @@ pip install pyyaml pymupdf
 python3 evals/smoke_test.py
 ```
 
-Il test controlla che il frontmatter di `SKILL.md` sia accettato da claude.ai e fa girare gli script su due piccoli corsi di prova generati da `evals/make_fixtures.py`: file sparsi come in chat, e una cartella del corso. La stessa verifica gira su GitHub a ogni push. In `evals/evals.json` ci sono i casi d'uso completi, da far eseguire a Claude con la skill-creator di Anthropic.
+Il test controlla che il frontmatter di `SKILL.md` sia accettato da claude.ai e fa girare gli script su piccoli corsi di prova generati da `evals/make_fixtures.py`: file sparsi come in chat, una cartella del corso, una presentazione PPTX. Se c'è pandoc prova anche la conversione in DOCX e HTML, e in PDF se c'è un motore LaTeX. La stessa verifica gira su GitHub a ogni push. In `evals/evals.json` ci sono i casi d'uso completi, da far eseguire a Claude con la skill-creator di Anthropic.
 
-Per pubblicare una nuova versione:
+Per pubblicare una nuova versione, aggiorna `metadata.version` in `.claude-plugin/marketplace.json` (la release controlla che sia uguale al tag), poi:
 
 ```bash
 git tag v1.0.0

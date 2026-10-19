@@ -119,13 +119,28 @@ def cmd_render(args):
     if not pages:
         sys.exit("Nessuna pagina da mostrare")
     tmp = Path(tempfile.mkdtemp(prefix="provino-"))
-    images = render_pages(args.pdf, pages, args.dpi, tmp)
+    try:
+        images = render_pages(args.pdf, pages, args.dpi, tmp)
+    except BaseException:  # anche sys.exit: la cartella temporanea non deve restare
+        shutil.rmtree(str(tmp), ignore_errors=True)
+        raise
     try:
         from PIL import Image, ImageDraw
-    except ImportError:
+    except ImportError:  # le immagini singole sono il risultato: la cartella resta
         print("Pillow non disponibile: immagini singole in %s" % tmp)
         return
-    ims = [Image.open(i).convert("RGB") for i in images]
+    try:
+        make_sheet(args, pages, images, Image, ImageDraw)
+    finally:
+        shutil.rmtree(str(tmp), ignore_errors=True)
+
+
+def make_sheet(args, pages, images, Image, ImageDraw):
+    """Compone il provino e lo salva in args.out."""
+    ims = []
+    for i in images:
+        with Image.open(i) as im:
+            ims.append(im.convert("RGB"))
     w = max(i.width for i in ims)
     h = max(i.height for i in ims) + 20
     cols = min(args.colonne, len(ims))

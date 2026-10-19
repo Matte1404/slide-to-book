@@ -239,6 +239,19 @@ def main():
             print("Simboli ed emoji nel PDF: font %s%s" % (sym_font, "; ancora senza glifo: " + " ".join(still)
                                                           if still else ""))
     made, failed = [], []
+    try:
+        convert_all(args, latex, header, made, failed)
+    finally:  # anche se una conversione si interrompe, l'header temporaneo non resta in giro
+        if header:
+            os.remove(header)
+    if failed:
+        print("Prodotti: Markdown%s. Non prodotti: %s." % ("".join(", " + f.upper() for f in made),
+                                                         ", ".join(f.upper() for f in failed)))
+    sys.exit(1 if failed and not made else 0)
+
+
+def convert_all(args, latex, header, made, failed):
+    """Produce i formati richiesti, aggiungendoli a made o a failed."""
     for fmt in ("docx", "pdf", "html"):  # il DOCX prima: senza LaTeX il PDF si ricava da lì
         if getattr(args, fmt):
             via_office = fmt == "pdf" and not latex
@@ -258,12 +271,6 @@ def main():
             else:
                 failed.append(fmt)
                 print("✗ %s non prodotto: %s" % (fmt, "\n   ".join(warnings) or "motivo sconosciuto"))
-    if header:
-        os.remove(header)
-    if failed:
-        print("Prodotti: Markdown%s. Non prodotti: %s." % ("".join(", " + f.upper() for f in made),
-                                                         ", ".join(f.upper() for f in failed)))
-    sys.exit(1 if failed and not made else 0)
 
 
 if __name__ == "__main__":

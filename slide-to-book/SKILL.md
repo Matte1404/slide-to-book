@@ -66,7 +66,7 @@ Usa esattamente le posizioni che compaiono nelle intestazioni dei file in `_font
 
 ## Ritmo di lavoro
 
-**Di regola genera tutto senza fermarti.** Chi allega i file con una frase sola ("usa questa skill e fammi il riassunto") vuole la dispensa finita, da rivedere alla fine. Deduci dai file tutto ciò che puoi (tipi, lezioni, date, modalità d'esame). Quando qualcosa è incerto, fai la scelta più ragionevole, annotala tra le "Scelte fatte" di `mappa.md` e riassumila nel messaggio di consegna: così l'utente sa che cosa controllare senza dover rispondere a domande prima di aver visto qualcosa.
+**Di regola genera tutto senza fermarti.** Chi allega i file con una frase sola ("usa questa skill e fammi il riassunto") vuole la dispensa finita, da rivedere alla fine. Nel primo messaggio dichiara però in una riga quanto è grande il lavoro (quante slide e lezioni, quanti capitoli prevedi) e che sarà una dispensa completa, non una sintesi di poche pagine: chi voleva solo un riassunto breve può fermarti, ma tu non aspettare la risposta. Deduci dai file tutto ciò che puoi (tipi, lezioni, date, modalità d'esame). Quando qualcosa è incerto, fai la scelta più ragionevole, annotala tra le "Scelte fatte" di `mappa.md` e riassumila nel messaggio di consegna: così l'utente sa che cosa controllare senza dover rispondere a domande prima di aver visto qualcosa.
 
 Fermati a chiedere solo se senza risposta il lavoro sarebbe inutile: i file non si aprono, non si capisce di che corso si tratta, gli allegati sembrano di corsi diversi. Anche allora, una sola domanda in un solo messaggio.
 
