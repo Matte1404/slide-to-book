@@ -107,14 +107,21 @@ def folder_kind(name):
 # mesi per esteso, cercati anche lontano dall'anno; le abbreviazioni ("set", "mar") solo accanto a un anno
 FULL_MONTHS = {w: n for w, n in MONTHS.items() if len(w) > 4 or w in ("june", "july")}
 MONTH_WORDS = "|".join(sorted(MONTHS, key=len, reverse=True))
+FULL_MONTH_WORDS = "|".join(sorted(FULL_MONTHS, key=len, reverse=True))
+# un anno di due cifre plausibile per un corso (2015-2039): "Lez_2_10-03" è la lezione 2 del 10 marzo,
+# non il 2 ottobre 2003
+YY = r"(?:1[5-9]|[23]\d)(?![._-]\d)"
 # una data all'inizio del nome, con l'ora se c'è: non è il numero della lezione. "12-03-2025 Lezione 4",
-# "2025.03.12_lez4", "2025-03-03 10-31-02" (OBS), "12 marzo 2025"; non "01_12-03-2025" (lezione 1, poi la data)
+# "2025.03.12_lez4", "2025-03-03 10-31-02" (OBS), "12 marzo 2025", "12 marzo" (mese per esteso);
+# non "01_12-03-2025" (lezione 1, poi la data), "02_set_di_esercizi" (abbreviazione senza anno)
+# né "01 - March 3" (lezione 1 del 3 marzo, all'inglese)
 LEADING_DATE = re.compile(
-    r"^(?:\d{1,2}[._-]\d{1,2}[._-](?:\d{4}|\d{2}(?![._-]\d))|\d{4}[._-]?\d{2}[._-]?\d{2}"
-    r"|\d{1,2}[\s._-]*(?:%s)[\s._-]*(?:\d{4}|\d{2}))"
-    r"(?:[\s._T-]+\d{1,2}[._h-]\d{2}(?:[._-]\d{2})?)?(?=[\s._-]|$)[\s._-]*" % MONTH_WORDS, re.I)
+    r"^(?:\d{1,2}[._-]\d{1,2}[._-](?:\d{4}|%s)|\d{4}[._-]?\d{2}[._-]?\d{2}"
+    r"|\d{1,2}[\s._-]*(?:%s)[\s._-]*(?:\d{4}|%s)|\d{1,2}[\s._-]*(?:%s)(?![a-z])(?![\s._-]*\d))"
+    r"(?:[\s._T-]+\d{1,2}[._h-]\d{2}(?:[._-]\d{2})?)?(?=[\s._-]|$)[\s._-]*" % (YY, MONTH_WORDS, YY, FULL_MONTH_WORDS),
+    re.I)
 # l'ultimo numero di una data ("Registrazione 12-03-2025"): non è il numero della lezione
-NOT_DATE = r"(?!\d)(?![._-]\d{1,2}[._-](?:\d{4}|\d{2}(?![._-]\d))(?!\d))"
+NOT_DATE = r"(?!\d)(?![._-]\d{1,2}[._-](?:\d{4}|%s)(?!\d))" % YY
 
 
 def file_number(path):

@@ -155,7 +155,10 @@ def regressions(tmp):
                "2025-03-12 lezione.vtt": None, "20250312_lezione_07.txt": 7, "03_intro.pdf": 3, "01-02_intro.pdf": 1,
                "2025-03-03 10-31-02.txt": None, "2025-03-12 10-30-15 Lezione 3.txt": 3, "01_12-03-2025.pdf": 1,
                "Registrazione 12-03-2025.txt": None, "12 marzo 2025 lezione 5.txt": 5, "02_set_di_esercizi.pdf": 2,
-               "L03_12.03.2025.pdf": 3, "Lez3_12-03-2025.pdf": 3, "lezione_3_12_03_2025.pdf": 3, "Lecture3_03-12-2025.pdf": 3}
+               "L03_12.03.2025.pdf": 3, "Lez3_12-03-2025.pdf": 3, "lezione_3_12_03_2025.pdf": 3, "Lecture3_03-12-2025.pdf": 3,
+               "Lez_2_10-03.pdf": 2, "12 marzo intro.pdf": None, "03 Maggio Lezione 5.pdf": 5, "Registrazione 12-03-25.txt": None,
+               "01 - March 3 - Intro.pdf": 1, "03 - March 17, 2025.pdf": 3, "04 - December 1st.pdf": 4,
+               "02 - March 10 - Arrays.pdf": 2}
     wrong = {n: es.file_number(Path(n)) for n, k in lessons.items() if es.file_number(Path(n)) != k}
     check(not wrong, "una data all'inizio del nome non è il numero della lezione%s" % ("" if not wrong else ": " + str(wrong)))
     out, _ = es.exam_ids([Path(n) for n in ["Esame 2023-24 giugno.pdf", "Soluzioni esame 2023-24.pdf",
@@ -809,7 +812,16 @@ def formats(tmp):
             os.symlink(tool, str(bins / Path(tool).name))
         path = os.pathsep.join([str(bins)] + [d for d in ("/usr/bin", "/bin") if not any(
             os.path.exists(os.path.join(d, e)) for e in ("xelatex", "lualatex", "tectonic"))])
-        proc = subprocess.run([sys.executable, str(SCRIPTS / "merge_book.py"), "--capitoli", str(book), "--out",
+        tricky = tmp / "titoli"  # titoli con formule, codice, parentesi, link, note, attributi, sottolineati
+        tricky.mkdir()
+        shutil.copy(str(book / "01-prova.md"), str(tricky / "01-prova.md"))
+        (tricky / "02-titoli.md").write_text(
+            "# Capitolo 2: Titoli\n\n## 2.1 L'intervallo [0, 1) e la retta\nVedi [le successioni](#successioni).\n\n"
+            "## 2.2 Successioni\n\n## 2.3 Notazione $O(n^{2})$\n\n## 2.4 Dizionari `{k: v}`\n\n## Legenda {#legenda}\n\n"
+            "## 2.5 Esame {.unnumbered}\n\n## 2.6 Vedi [la legenda](#legenda)\n\n## 2.7 Bolzano[^1] ##\n\n[^1]: Una nota.\n\n"
+            "Titolo sottolineato\n-------------------\n\n````markdown\n```python\n# dentro il codice\n```\n````\n\n"
+            "## 2.8 Simboli ⏳ 🇮🇹 👍🏽 👨\u200d👩\u200d👧\n", encoding="utf-8")
+        proc = subprocess.run([sys.executable, str(SCRIPTS / "merge_book.py"), "--capitoli", str(tricky), "--out",
                                str(tmp / "office" / "Prova.md"), "--titolo", "Prova", "--pdf"],
                               capture_output=True, text=True, env=dict(os.environ, PATH=path))
         try:
@@ -820,6 +832,16 @@ def formats(tmp):
         text = "".join(p.get_text() for p in fitz.open(str(pdf))) if pdf.is_file() else ""
         check("LibreOffice" in proc.stdout and "★★★" in text and "Indice" in text and text.count("Capitolo 1: Prova") >= 2,
               "PDF da LibreOffice con le stelle e l'indice")
+        titles = ["2.1 L’intervallo [0, 1) e la retta", "2.2 Successioni", "2.3 Notazione", "2.4 Dizionari {k: v}", "Legenda",
+                  "2.5 Esame", "2.6 Vedi la legenda", "2.7 Bolzano", "Titolo sottolineato"]
+        links = [p.get_textbox(l["from"]).strip() for p in fitz.open(str(pdf)) for l in p.get_links()] if pdf.is_file() else []
+        symbols = re.findall(r"2\.8 Simboli ([^\n]*)", text)
+        squeezed = re.sub(r"\s", "", text)  # le versioni di PyMuPDF dividono le parole in modo diverso
+        check(all(squeezed.count(re.sub(r"\s", "", x)) >= 2 for x in titles) and "{#" not in text and "](#" not in text
+              and len(symbols) >= 2 and all(s.split() == ["•"] * 4 for s in symbols) and "\u200d" not in text
+              and text.count("Una nota.") == 1 and text.count("# dentro il codice") == 1
+              and "le successioni" in links and "la legenda" in links,
+              "indice del PDF da LibreOffice con titoli difficili, rimandi e codice intatti")
     else:
         print("  - LibreOffice non installato: PDF senza LaTeX non provato")
     if any(shutil.which(e) for e in ("xelatex", "lualatex", "tectonic")):
