@@ -800,6 +800,28 @@ def formats(tmp):
           "DOCX prodotto con pandoc, con l'elenco come elenco")
     page = html.read_text(encoding="utf-8") if html.is_file() else ""
     check("<li>un punto</li>" in page and "Capitolo 1" in page, "HTML prodotto con pandoc")
+    check("<math" in page, "HTML con le formule in MathML, visibili senza internet")
+    office = shutil.which("soffice") or shutil.which("libreoffice")
+    if office:  # senza LaTeX il PDF passa da LibreOffice: stelle visibili e indice scritto nel testo
+        bins = tmp / "bin"
+        bins.mkdir()
+        for tool in (shutil.which("pandoc"), office):
+            os.symlink(tool, str(bins / Path(tool).name))
+        path = os.pathsep.join([str(bins)] + [d for d in ("/usr/bin", "/bin") if not any(
+            os.path.exists(os.path.join(d, e)) for e in ("xelatex", "lualatex", "tectonic"))])
+        proc = subprocess.run([sys.executable, str(SCRIPTS / "merge_book.py"), "--capitoli", str(book), "--out",
+                               str(tmp / "office" / "Prova.md"), "--titolo", "Prova", "--pdf"],
+                              capture_output=True, text=True, env=dict(os.environ, PATH=path))
+        try:
+            import pymupdf as fitz
+        except ImportError:
+            import fitz
+        pdf = tmp / "office" / "Prova.pdf"
+        text = "".join(p.get_text() for p in fitz.open(str(pdf))) if pdf.is_file() else ""
+        check("LibreOffice" in proc.stdout and "★★★" in text and "Indice" in text and text.count("Capitolo 1: Prova") >= 2,
+              "PDF da LibreOffice con le stelle e l'indice")
+    else:
+        print("  - LibreOffice non installato: PDF senza LaTeX non provato")
     if any(shutil.which(e) for e in ("xelatex", "lualatex", "tectonic")):
         proc = run(SCRIPTS / "merge_book.py", "--capitoli", book, "--out", tmp / "Prova.md", "--titolo", "Prova", "--pdf")
         check(proc.returncode == 0 and "✓ pdf" in proc.stdout and (tmp / "Prova.pdf").is_file(),

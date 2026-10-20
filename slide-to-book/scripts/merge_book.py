@@ -13,7 +13,9 @@ Uso:
 - Le conversioni usano pandoc. Per il PDF serve un motore LaTeX Unicode (xelatex,
   lualatex o tectonic); i caratteri di disegno degli alberi e i simboli matematici
   richiedono un font che li contenga (--font, --font-mono). Senza LaTeX il PDF si
-  ricava dal DOCX con LibreOffice, se c'è; altrimenti viene saltato.
+  ricava dal DOCX con LibreOffice, se c'è, con le emoji sostituite da simboli (⭐ -> ★)
+  e l'indice scritto nel testo; altrimenti viene saltato.
+- L'HTML usa MathML: le formule si vedono anche senza internet.
 - Produce i formati che l'ambiente permette e dice che cosa manca. Esce con codice 1
   solo se nessuno dei formati richiesti è stato prodotto.
 """
@@ -39,6 +41,7 @@ SYMBOL_CANDIDATES = ["STIXGeneral", "DejaVu Sans", "Noto Sans Symbols 2", "Noto 
                      "Apple Symbols", "Segoe UI Symbol", "Symbola"]
 EMOJI = {"⭐": "★", "🎓": "▸", "✅": "✓", "❌": "✗", "📌": "▸", "💡": "▸", "👉": "▸", "❗": "!",
          "\ufe0f": ""}  # U+FE0F: selettore "versione emoji" (come in ⚠️), da togliere
+TOC_TITLE = {"it": "Indice", "en": "Contents", "fr": "Table des matières", "es": "Índice", "de": "Inhalt"}
 
 
 def used_chars(text):
@@ -133,19 +136,43 @@ def latex_engine():
     return next((e for e in ("xelatex", "lualatex", "tectonic") if shutil.which(e)), None)
 
 
-def office_pdf(src, docx=None):
-    """PDF ricavato da un DOCX con LibreOffice, quando manca un motore LaTeX. Se il DOCX non è stato
-    appena prodotto lo crea in una cartella temporanea, così non usa un DOCX vecchio rimasto accanto.
-    Restituisce (pdf o None, motivi)."""
+def office_markdown(src, out, lang):
+    """Il Markdown unito preparato per LibreOffice. Le emoji diventano simboli che i suoi font hanno
+    (⭐ -> ★): le emoji a colori nel PDF resterebbero spazi vuoti. L'indice è scritto nel testo, con un
+    collegamento a ogni titolo: LibreOffice senza interfaccia non aggiorna il campo dell'indice del DOCX
+    e lo lascerebbe vuoto."""
+    text = Path(src).read_text(encoding="utf-8")
+    for emoji, symbol in EMOJI.items():
+        text = text.replace(emoji, symbol)
+    text = re.sub("[\U0001F000-\U0001FFFF]", "•", text)  # le altre emoji a colori
+    lines = text.split("\n")
+    start = lines.index("---", 1) + 1 if lines and lines[0] == "---" and "---" in lines[1:] else 0
+    toc, fence = [], False
+    for k in range(start, len(lines)):
+        if lines[k].lstrip().startswith(("```", "~~~")):
+            fence = not fence
+        m = None if fence else re.match(r"^(#{1,2})\s+(.*?)\s*$", lines[k])
+        if m and "{" not in m.group(2):
+            lines[k] = "%s %s {#indice-%d}" % (m.group(1), m.group(2), len(toc) + 1)
+            toc.append("%s- [%s](#indice-%d)" % ("  " * (len(m.group(1)) - 1), m.group(2), len(toc) + 1))
+    if toc:
+        lines[start:start] = ["", "# %s" % TOC_TITLE.get(lang, TOC_TITLE["it"]), ""] + toc + [""]
+    Path(out).write_text("\n".join(lines), encoding="utf-8")
+
+
+def office_pdf(src, lang):
+    """PDF ricavato da un DOCX con LibreOffice, quando manca un motore LaTeX. Il DOCX è preparato a parte,
+    in una cartella temporanea, da office_markdown(). Restituisce (pdf o None, motivi)."""
     office = next((shutil.which(c) for c in ("soffice", "libreoffice") if shutil.which(c)), None)
     if not office:
         return None, ["nessun motore LaTeX (xelatex, lualatex, tectonic) né LibreOffice (soffice)"]
     tmp = Path(tempfile.mkdtemp(prefix="dispensa-pdf-"))
     try:
-        if docx is None:
-            docx, warnings = convert(src, "docx", None, None, out=tmp / (Path(src).stem + ".docx"))
-            if not docx:
-                return None, ["il DOCX da convertire non è stato prodotto"] + warnings
+        prepared = tmp / Path(src).name
+        office_markdown(src, prepared, lang)
+        docx, warnings = convert(prepared, "docx", None, None, out=tmp / (Path(src).stem + ".docx"), toc=False)
+        if not docx:
+            return None, ["il DOCX da convertire non è stato prodotto"] + warnings
         # un profilo di LibreOffice a parte: non si blocca se LibreOffice è già aperto
         cmd = [office, "-env:UserInstallation=" + (tmp / "profilo").as_uri(), "--headless",
                "--convert-to", "pdf", "--outdir", str(tmp), str(Path(docx).resolve())]
@@ -164,12 +191,12 @@ def office_pdf(src, docx=None):
         shutil.rmtree(str(tmp), ignore_errors=True)
 
 
-def convert(src, fmt, font, font_mono, header=None, out=None):
+def convert(src, fmt, font, font_mono, header=None, out=None, toc=True, lang=None):
     """Converte con pandoc. Restituisce (file prodotto o None, righe di avviso o motivi dell'errore)."""
     if not shutil.which("pandoc"):
         return None, ["pandoc non trovato: per PDF, DOCX e HTML serve pandoc (il Markdown unito è pronto)"]
     out = out or Path(src).with_suffix("." + fmt)
-    cmd = ["pandoc", str(src), "-o", str(out), "--toc", "--toc-depth=2",
+    cmd = ["pandoc", str(src), "-o", str(out)] + (["--toc", "--toc-depth=2"] if toc else []) + [
            # elenchi e titoli subito dopo una riga di testo, senza riga vuota in mezzo, come li
            # accettano GitHub e gli editor: senza queste estensioni pandoc li fonde nel paragrafo
            "-f", "markdown+tex_math_dollars+lists_without_preceding_blankline-blank_before_header"
@@ -181,7 +208,10 @@ def convert(src, fmt, font, font_mono, header=None, out=None):
         cmd += ["-V", "monofont=" + font_mono] if font_mono else []
         cmd += ["-H", header] if header else []
     elif fmt == "html":
-        cmd += ["--standalone", "--embed-resources", "--mathjax"]
+        # MathML: le formule si vedono anche senza internet (MathJax arriverebbe da una CDN a ogni apertura)
+        cmd += ["--standalone", "--embed-resources", "--mathml"]
+    if toc and fmt != "pdf" and lang in TOC_TITLE:  # nel PDF il titolo dell'indice lo mette LaTeX dalla lingua
+        cmd += ["-M", "toc-title=" + TOC_TITLE[lang]]
     proc = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0 and fmt == "html" and "embed-resources" in proc.stderr:
         # pandoc precedente alla 2.19: l'opzione si chiamava --self-contained
@@ -256,9 +286,10 @@ def convert_all(args, latex, header, made, failed):
         if getattr(args, fmt):
             via_office = fmt == "pdf" and not latex
             if via_office:
-                out, warnings = office_pdf(args.out, Path(args.out).with_suffix(".docx") if "docx" in made else None)
+                out, warnings = office_pdf(args.out, args.lingua)
             else:
-                out, warnings = convert(args.out, fmt, args.font, args.font_mono, header if fmt == "pdf" else None)
+                out, warnings = convert(args.out, fmt, args.font, args.font_mono, header if fmt == "pdf" else None,
+                                        lang=args.lingua)
             if out:
                 made.append(fmt)
                 missing = sorted(set(w for w in warnings if "Missing character" in w))
