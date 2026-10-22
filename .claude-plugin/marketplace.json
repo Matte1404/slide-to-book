@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Dispense complete in stile libro da slide, trascrizioni delle lezioni ed esami passati",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
