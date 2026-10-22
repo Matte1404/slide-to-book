@@ -25,8 +25,8 @@ mio-corso/
 - **Numeri nei nomi dei file**: `01_…` nelle slide e `lezione01…` nelle trascrizioni fanno corrispondere la stessa lezione. Senza numeri vale l'ordine alfabetico.
 - **Data nel nome degli esami**: serve a identificare l'appello e a dare più peso a quelli recenti. Vanno bene `2025-06-16`, `16-06-2025`, `giugno_2025`, `giu25`.
 - **Moduli**: le sottocartelle per modulo dentro `slide/` (`slide/modulo1/`, `slide/modulo2/`) vanno bene. Se i numeri delle lezioni ripartono in ogni modulo, le slide diventano `S1-01`, `S2-01`, ...; in quel caso metti anche le trascrizioni in sottocartelle con gli stessi nomi, altrimenti non corrispondono.
-- **Registrazioni audio o video**: vanno trascritte prima, per esempio con la trascrizione automatica di Teams o con Whisper. La skill legge testo (TXT, DOCX, SRT, VTT, PDF), non audio, e segnala i file da trascrivere.
-- **Formati**: slide in PDF o PPTX; trascrizioni in TXT, DOCX, SRT, VTT o PDF; esami in PDF, DOCX o immagini.
+- **Registrazioni audio o video**: vanno trascritte prima, per esempio con la trascrizione automatica di Teams o con Whisper. La skill legge testo (TXT, DOCX, MD, SRT, VTT, PDF), non audio, e segnala i file da trascrivere.
+- **Formati**: slide in PDF o PPTX; trascrizioni in TXT, DOCX, MD, SRT, VTT o PDF; esami in PDF, DOCX o immagini.
 
 Poi chiedi, per esempio:
 
@@ -85,7 +85,8 @@ Su claude.ai non serve installare niente. Altrove gli script usano ciò che trov
 
 - **Python 3.8 o successivo**, per gli script;
 - per leggere i **PDF**, uno fra `pdftotext` (poppler), PyMuPDF, pypdf, pdfplumber;
-- per avere la dispensa in **DOCX o HTML**, `pandoc`; per il **PDF**, anche un motore LaTeX Unicode (xelatex, lualatex o tectonic);
+- per avere la dispensa in **DOCX o HTML**, `pandoc` (l'HTML mostra le formule anche senza internet); per il **PDF**, anche un motore LaTeX Unicode (xelatex, lualatex o tectonic) oppure LibreOffice, che lo ricava dal DOCX;
+- per guardare le slide come immagini, `pdftoppm` (poppler) o PyMuPDF; con Pillow `visual.py` le compone anche in un provino, senza restano le singole immagini;
 - PPTX, DOCX e testo non richiedono nulla.
 
 ## Struttura del repository
@@ -118,20 +119,20 @@ pip install pyyaml pymupdf
 python3 evals/smoke_test.py
 ```
 
-Il test controlla che il frontmatter di `SKILL.md` sia accettato da claude.ai e fa girare gli script su piccoli corsi di prova generati da `evals/make_fixtures.py`: file sparsi come in chat, una cartella del corso, una presentazione PPTX. Se c'è pandoc prova anche la conversione in DOCX e HTML, e in PDF se c'è un motore LaTeX. La stessa verifica gira su GitHub a ogni push. In `evals/evals.json` ci sono i casi d'uso completi, da far eseguire a Claude con la skill-creator di Anthropic.
+Il test controlla che il frontmatter di `SKILL.md` sia accettato da claude.ai e fa girare gli script su piccoli corsi di prova generati da `evals/make_fixtures.py`: file sparsi come in chat, una cartella del corso, una presentazione PPTX. Se c'è pandoc prova anche la conversione in DOCX e HTML, e in PDF se c'è un motore LaTeX o LibreOffice. La stessa verifica gira su GitHub a ogni push. In `evals/evals.json` ci sono i casi d'uso completi, da far eseguire a Claude con la skill-creator di Anthropic.
 
-Per pubblicare una nuova versione, aggiorna `metadata.version` in `.claude-plugin/marketplace.json` (la release controlla che sia uguale al tag), poi:
+Per pubblicare una nuova versione, aggiorna `metadata.version` in `.claude-plugin/marketplace.json` (la release controlla che sia uguale al tag), poi crea e pubblica il tag con lo stesso numero, per esempio:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 La GitHub Action crea la release e allega `slide-to-book.zip`. Per crearlo a mano: `zip -r slide-to-book.zip slide-to-book -x '*.DS_Store' '*__pycache__*'`.
 
 ## Materiale dei corsi
 
-Non aggiungere a questo repository slide, trascrizioni, esami o dispense: sono materiale dei docenti, e le trascrizioni possono contenere dati personali. Il `.gitignore` esclude gli zip, le cartelle `dispensa/` e `_fonti/` e i formati del materiale (PDF, PPTX, DOCX, audio e video).
+Non aggiungere a questo repository slide, trascrizioni, esami o dispense: sono materiale dei docenti, e le trascrizioni possono contenere dati personali. Il `.gitignore` esclude gli zip, le cartelle `dispensa/` e `_fonti/`, le cartelle tipiche di un corso (`slide/`, `trascrizioni/`, `esami/`, `altro/`, ...) e i formati del materiale (PDF, PPTX, DOCX, testo, immagini, audio e video).
 
 Se la cartella del tuo corso è a sua volta un repository git, ricorda che `dispensa/` contiene anche il testo completo estratto dalle slide (`dispensa/_fonti/`): non pubblicarla.
 
