@@ -44,7 +44,10 @@ Dipendenze: nessuna per PPTX, DOCX e testo. Per i PDF basta uno fra pdftotext
 """
 
 import argparse
+import functools
+import hashlib
 import json
+import os
 import posixpath
 import re
 import shutil
@@ -101,15 +104,36 @@ def folder_kind(name):
     return None
 
 
+# mesi per esteso, cercati anche lontano dall'anno; le abbreviazioni ("set", "mar") solo accanto a un anno
+FULL_MONTHS = {w: n for w, n in MONTHS.items() if len(w) > 4 or w in ("june", "july")}
+MONTH_WORDS = "|".join(sorted(MONTHS, key=len, reverse=True))
+FULL_MONTH_WORDS = "|".join(sorted(FULL_MONTHS, key=len, reverse=True))
+# un anno di due cifre plausibile per un corso (2015-2039): "Lez_2_10-03" è la lezione 2 del 10 marzo,
+# non il 2 ottobre 2003
+YY = r"(?:1[5-9]|[23]\d)(?![._-]\d)"
+# una data all'inizio del nome, con l'ora se c'è: non è il numero della lezione. "12-03-2025 Lezione 4",
+# "2025.03.12_lez4", "2025-03-03 10-31-02" (OBS), "12 marzo 2025", "12 marzo" (mese per esteso);
+# non "01_12-03-2025" (lezione 1, poi la data), "02_set_di_esercizi" (abbreviazione senza anno)
+# né "01 - March 3" (lezione 1 del 3 marzo, all'inglese)
+LEADING_DATE = re.compile(
+    r"^(?:\d{1,2}[._-]\d{1,2}[._-](?:\d{4}|%s)|\d{4}[._-]?\d{2}[._-]?\d{2}"
+    r"|\d{1,2}[\s._-]*(?:%s)[\s._-]*(?:\d{4}|%s)|\d{1,2}[\s._-]*(?:%s)(?![a-z])(?![\s._-]*\d))"
+    r"(?:[\s._T-]+\d{1,2}[._h-]\d{2}(?:[._-]\d{2})?)?(?=[\s._-]|$)[\s._-]*" % (YY, MONTH_WORDS, YY, FULL_MONTH_WORDS),
+    re.I)
+# l'ultimo numero di una data ("Registrazione 12-03-2025"): non è il numero della lezione
+NOT_DATE = r"(?!\d)(?![._-]\d{1,2}[._-](?:\d{4}|%s)(?!\d))" % YY
+
+
 def file_number(path):
-    """Numero della lezione nel nome del file: "03_intro.pdf", "lez03.txt", "Lezione 3.docx", "Slide 03.pdf".
-    "Esercitazione 1.pdf" non ha un numero di lezione."""
-    m = re.match(r"0*(\d{1,3})(?=[\s._-]|$)", path.stem)
+    """Numero della lezione nel nome del file: "03_intro.pdf", "lez03.txt", "Lezione 3.docx", "Slide 03.pdf",
+    "12-03-2025 Lezione 4.pdf" (la data iniziale non conta). "Esercitazione 1.pdf" non ha un numero di lezione."""
+    stem = LEADING_DATE.sub("", path.stem)
+    m = re.match(r"0*(\d{1,3})(?=[\s._-]|$)", stem)
     if m:
         return int(m.group(1))
     m = re.search(r"(?<![a-z])(?:lez(?:ione)?|lecture|lesson|lec|l|slides?|trascrizione|registrazione|sbobina"
-                  r"(?:tura)?|transcript|week|settimana|cap(?:itolo)?|chapter|unit)[\s._-]*0*(\d{1,3})(?!\d)",
-                  path.stem, re.I)
+                  r"(?:tura)?|transcript|week|settimana|cap(?:itolo)?|chapter|unit)[\s._-]*0*(\d{1,3})" + NOT_DATE,
+                  stem, re.I)
     return int(m.group(1)) if m else None
 
 
@@ -149,6 +173,14 @@ def numbered_ids(prefix, items, modules, use_modules=None):
     return ids, "; ".join(how), False
 
 
+def academic_year(s):
+    """(primo anno, match) di un anno accademico nel nome ("2024-25", "2023_2024"), o None."""
+    for m in re.finditer(r"(?<!\d)(20\d{2})\s*[._/-]\s*(20\d{2}|\d{2})(?!\d)", s):
+        if int(m.group(2)) % 100 == (int(m.group(1)) + 1) % 100:
+            return int(m.group(1)), m
+    return None
+
+
 def exam_date(path):
     """(anno, mese) dal nome del file di un esame, o (anno, None), o None."""
     s = path.stem.lower()
@@ -160,16 +192,30 @@ def exam_date(path):
     if m and 1 <= int(m.group(2)) <= 12:
         y = int(m.group(3))
         return (y if y > 99 else 2000 + y), int(m.group(2))
-    m = re.search(r"(?<![\d.])(0?[1-9]|1[0-2])[\s._-](20\d{2})(?!\d)", s)  # 06-2025
+    words = sorted(MONTHS.items(), key=lambda kv: -len(kv[0]))
+    for word, month in words:  # "June 12 2025", "Sept 1st, 2024": il numero dopo il mese è il giorno
+        m = re.search(r"(?<![a-z])%s(?![a-z])[\s._-]+\d{1,2}(?:st|nd|rd|th)?[\s,._-]+(20\d{2})(?!\d)" % word, s)
+        if m:
+            return int(m.group(1)), month
+    # 06-2025, 6-2025; non "Analisi 1 2024" o "appello_1_2024", dove la cifra è il numero del corso o dell'appello
+    m = re.search(r"(?:(?<![\d.])(0[1-9]|1[0-2])[\s._-]|(?<![^\s_-])([1-9])[.-])(20\d{2})(?!\d)", s)
     if m:
-        return int(m.group(2)), int(m.group(1))
-    for word, month in sorted(MONTHS.items(), key=lambda kv: -len(kv[0])):
+        return int(m.group(3)), int(m.group(1) or m.group(2))
+    far = lambda: next((n for w, n in words if w in FULL_MONTHS and re.search(r"(?<![a-z])%s(?![a-z])" % w, s)), None)
+    ay = academic_year(s)
+    if ay:  # anno accademico: da ottobre a dicembre il primo anno, da gennaio a settembre il secondo
+        first, m = ay
+        # un'abbreviazione vale solo accanto all'anno accademico, e non se è seguita da una lettera ("Set A")
+        month = far() or next((n for w, n in words if re.search(r"(?<![a-z])%s(?![a-z])[\s._-]*$" % w, s[:m.start()])
+                               or re.match(r"[\s._-]*%s(?![a-z])(?![\s._-]+(?:[a-z]|\d{1,2})(?![a-z\d]))" % w, s[m.end():])), None)
+        return (first if month and month >= 10 else first + 1 if month else first), month
+    for word, month in words:
         m = re.search(r"(?<![a-z])%s(?![a-z])[\s._-]*'?(20\d{2}|\d{2})(?!\d)" % word, s)
         if m:
             y = int(m.group(1))
             return (y if y > 99 else 2000 + y), month
     m = re.search(r"(?<!\d)(20\d{2})(?!\d)", s)
-    return (int(m.group(1)), None) if m else None
+    return (int(m.group(1)), far()) if m else None
 
 
 def exam_key(path):
@@ -203,6 +249,14 @@ def exam_ids(files):
             d = exam_date(f)
             base = ("E%d-%02d" % d if d[1] else "E%d" % d[0]) if d else None
             match = [i for i, t in out if base and re.fullmatch(re.escape(base) + "[a-z]?", i)]
+        if len(match) != 1 and d and not d[1]:  # soluzioni con il solo anno: l'unico esame di quell'anno senza soluzioni
+            ay = academic_year(f.stem.lower())
+            years = {d[0]} | ({ay[0], ay[0] + 1} if ay else set())
+            solved = {i[:-4] for i, _ in out if i.endswith("-sol")}
+            match = [i for i, t in out if i not in solved
+                     and re.fullmatch(r"E(?:%s)(?:-\d\d)?[a-z]?" % "|".join(map(str, years)), i)]
+            if len(match) == 1:
+                notes.append("%s: soluzioni abbinate a %s solo per l'anno, controlla" % (f.name, match[0]))
         if len(match) == 1:
             sid = match[0] + "-sol"
         else:
@@ -293,20 +347,198 @@ def scan_course(root):
     return lines, notes
 
 
-def source_key(path):
-    """Cartella e nome del file: identifica una fonte anche se il comando è lanciato da un'altra cartella."""
-    p = Path(path)
-    return "%s/%s" % (p.parent.name.lower(), p.name.lower())
+def course_rel(path, root):
+    """Percorso di una fonte relativo alla cartella del corso, in minuscolo ("modulo1/slide/01.pdf"),
+    o None se il corso non è noto o il file sta fuori. È ciò che identifica una fonte quando il corso
+    viene spostato o riallegato in una chat nuova, dove cambia solo la parte prima della cartella."""
+    if root is None:
+        return None
+    try:
+        rel = Path(os.path.abspath(str(path))).relative_to(os.path.abspath(str(root)))
+    except ValueError:
+        return None
+    return rel.as_posix().lower()
 
 
-def keep_known_ids(lines, index):
+def common_tail(a, b):
+    """Quanti componenti finali hanno in comune due percorsi (senza distinguere maiuscole)."""
+    pa = [s.lower() for s in Path(a).parts if s != "."]
+    pb = [s.lower() for s in Path(b).parts if s != "."]
+    n = 0
+    while n < min(len(pa), len(pb)) and pa[-1 - n] == pb[-1 - n]:
+        n += 1
+    return n
+
+
+def same_place(a, b):
+    """Stesso percorso visto dalla cartella da cui si lancia lo script ("programma.pdf" e "./programma.pdf")."""
+    norm = lambda p: os.path.normcase(os.path.abspath(str(p))).lower()
+    return norm(a) == norm(b)
+
+
+def match_score(entry, path, rel):
+    """Quanto il file path (rel: il suo percorso nel corso, o None) somiglia alla fonte entry
+    dell'indice: 0 se è un altro file, più alto se corrisponde meglio.
+
+    Con il percorso nel corso da tutte e due le parti, uno deve finire con l'altro: modulo1/slide/01.pdf
+    e modulo2/slide/01.pdf sono due fonti, slide/01.pdf e modulo1/slide/01.pdf (corso riorganizzato
+    in moduli) possono essere la stessa. Altrimenti basta lo stesso percorso visto da qui, oppure
+    cartella e nome uguali come nelle versioni precedenti dello script: più componenti finali uguali,
+    migliore la corrispondenza."""
+    old = entry.get("rel")
+    if old and rel:
+        n = common_tail(old, rel)
+        if n < min(len(old.split("/")), len(rel.split("/"))):
+            return 0
+        return 2000 if old == rel else 1000 + n
+    if same_place(entry["file"], path):
+        return 1500
+    if old:  # la fonte ha il percorso nel corso, path no: path deve finire con quel percorso
+        n = common_tail(old, path)
+        return 1000 + n if n >= len(old.split("/")) else 0
+    n = common_tail(entry["file"], rel or path)
+    return n if n >= 2 else 0
+
+
+@functools.lru_cache(maxsize=None)
+def file_sha1(path):
+    try:
+        return hashlib.sha1(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def text_lines(text):
+    return [" ".join(l.split()) for l in text.split("\n") if l.strip()]
+
+
+def saved_units(text, sid):
+    """[(etichetta, righe)] di un file di _fonti/, senza gli avvisi dello script."""
+    out = []
+    for m in re.finditer(r"(?ms)^## \[%s, (.+?)\]\n(.*?)(?=^## \[|\Z)" % re.escape(sid), text):
+        out.append((m.group(1), [l for l in text_lines(m.group(2)) if not l.startswith("⚠")
+                                 and l != "(nessun testo estratto)"]))
+    return out
+
+
+def in_order(small, big):
+    """Le righe di small compaiono tutte in big, nello stesso ordine (big può averne altre in mezzo)."""
+    it = iter(big)
+    return all(any(line == other for other in it) for line in small)
+
+
+@functools.lru_cache(maxsize=None)
+def fresh_units(prefix, path):
+    """Unità estratte da un file come se fosse una fonte di tipo prefix (S, T, E, X), o None."""
+    try:
+        return [(label, text_lines(text or "")) for label, text, _ in extract(prefix + "0", Path(path))[0]]
+    except Exception:  # file illeggibile o formato non supportato: non si può dire
+        return None
+
+
+@functools.lru_cache(maxsize=None)
+def same_extraction(fonti, sid, path):
+    """Per una fonte estratta da una versione dello script che non salvava il contenuto (sha1): il
+    file path dà lo stesso testo di _fonti/<ID>.md, unità per unità? Le letture visive aggiunte
+    dopo, anche su più righe, stanno in mezzo al testo estratto e non contano."""
+    try:
+        saved = saved_units((Path(fonti) / (sid + ".md")).read_text(encoding="utf-8", errors="replace"), sid)
+    except OSError:
+        return False
+    fresh = fresh_units(sid[0], str(path))
+    # una foto o una scansione non ha testo: due immagini diverse "coinciderebbero" sempre
+    if not saved or fresh is None or len(re.sub(r"\s", "", "".join(l for _, ls in fresh for l in ls))) < LOW_TEXT:
+        return False
+    return len(saved) == len(fresh) and all(a == c and in_order(b, d) for (c, d), (a, b) in zip(saved, fresh))
+
+
+def by_content(pairs, fonti=None):
+    """Fra terne (ID, fonte dell'indice, file) a pari merito, la sola con lo stesso contenuto, o None.
+    Serve quando il nome non basta: slide/01.pdf spostato in modulo1/slide/ accanto a modulo2/slide/01.pdf.
+    Per le fonti senza sha1 (indici delle versioni precedenti) si confronta il testo estratto."""
+    def same(k, e, p):
+        if e.get("sha1"):
+            return e["sha1"] == file_sha1(str(p))
+        return bool(fonti) and same_extraction(str(fonti), k, str(p))
+    hits = [(k, e, p) for k, e, p in pairs if same(k, e, p)]
+    if len(hits) > 1 and len({k for k, _, _ in hits}) == 1 and len({file_sha1(str(p)) for _, _, p in hits}) == 1:
+        return min(hits, key=lambda h: natural_key(h[2]))  # copie identiche: qualunque tiene valide le citazioni
+    return hits[0] if len(hits) == 1 else None
+
+
+MAX_COMPARE = 200  # confronti di testo al massimo per ritrovare i file rinominati
+
+
+def assign_known(paths, index, root, ambiguous=None, fonti=None, kinds=None):
+    """Per i file di un comando, l'ID con cui sono già stati estratti: {percorso: ID}. Ogni ID va al
+    solo file che gli corrisponde meglio; a pari merito decide il contenuto, se no non va a nessuno
+    e il file prende un ID nuovo. Un file che il percorso non riconosce (cartella del modulo
+    rinominata, file rinominato) tiene l'ID di una fonte rimasta senza file con lo stesso contenuto.
+    In ambiguous, se c'è, finiscono gli ID che nessuno tiene perché più file gli somigliano allo stesso modo.
+    kinds, se c'è, dà la lettera del tipo previsto per ogni file (S, T, E, X): un file rinominato ritrovato dal
+    testo tiene l'ID solo se è dello stesso tipo."""
+    sources = {k: v for k, v in index.items() if not v.get("diviso")}
+    claims = {}  # ID già estratto -> file che gli corrispondono meglio che a ogni altro ID, con il punteggio
+    for path in paths:
+        rel = course_rel(path, root)
+        scores = {k: match_score(v, path, rel) for k, v in sources.items()}
+        best = max(scores.values(), default=0)
+        ids = [k for k, s in scores.items() if s == best]
+        if best and len(ids) > 1:
+            pick = by_content([(k, sources[k], path) for k in ids], fonti)
+            ids = [pick[0]] if pick else []
+        if best and len(ids) == 1:
+            claims.setdefault(ids[0], []).append((best, path))
+    out = {}
+    for known, cands in sorted(claims.items()):
+        top = max(s for s, _ in cands)
+        winners = [p for s, p in cands if s == top]
+        if len(winners) > 1:
+            pick = by_content([(known, sources[known], p) for p in winners], fonti)
+            if not pick and ambiguous is not None:
+                ambiguous[known] = winners
+            winners = [pick[2]] if pick else []
+        if len(winners) == 1:
+            out[winners[0]] = known
+    # fonti rimaste senza file (cartella o file rinominati): non una copia di un file che c'è ancora
+    free = {k: v for k, v in sources.items() if k not in out.values() and v.get("sha1") and not os.path.exists(v["file"])}
+    by_sha = {}
+    for path in paths:
+        if path not in out and file_sha1(str(path)):
+            by_sha.setdefault(file_sha1(str(path)), []).append(path)
+    for sha, cands in by_sha.items():
+        same = [k for k, v in free.items() if v["sha1"] == sha]
+        if len(cands) == 1 and len(same) == 1:
+            out[cands[0]] = same[0]
+            if ambiguous is not None:
+                ambiguous.pop(same[0], None)
+    if fonti:  # fonti di una versione precedente (senza sha1) il cui file non c'è più: file rinominato?
+        lost = [k for k, v in sources.items() if k not in out.values() and not v.get("sha1")
+                and not os.path.exists(v["file"])]
+        pairs = [(k, p) for k in lost for p in paths if p not in out
+                 and Path(p).suffix.lower() == Path(sources[k]["file"]).suffix.lower()
+                 and (kinds is None or kinds.get(p, k[0]) == k[0])]
+        if len(pairs) <= MAX_COMPARE:  # ogni confronto estrae di nuovo il file
+            hits = [(k, p) for k, p in pairs if same_extraction(str(fonti), k, str(p))]
+            for k, p in hits:
+                if sum(1 for kk, _ in hits if kk == k) == 1 and sum(1 for _, pp in hits if pp == p) == 1:
+                    out[p] = k
+    return out
+
+
+def keep_known_ids(lines, index, root, fonti=None):
     """Rilanciando --corso, un file già estratto tiene il suo ID (le citazioni già scritte restano
-    valide) e un file nuovo prende un ID libero, invece di spostare la numerazione degli altri."""
-    known = {source_key(v["file"]): k for k, v in index.items() if not v.get("diviso")}
+    valide) e un file nuovo prende un ID libero, invece di spostare la numerazione degli altri.
+    Restituisce (righe, ID cambiati, avvisi)."""
     taken = set(index)
     planned = [l.partition("=") for l in lines]
-    keep = {path: known[source_key(path)] for sid, sep, path in planned
-            if sep and not sid.startswith("#") and sid != "T" and source_key(path) in known}
+    ambiguous = {}
+    paths = [(sid, path) for sid, sep, path in planned if sep and not sid.startswith("#") and sid != "T"]
+    keep = assign_known([p for _, p in paths], index, root, ambiguous, fonti, {p: s[0] for s, p in paths})
+    doubts = ["%s (%s) corrisponde allo stesso modo a %s: nessuno lo tiene e prendono ID nuovi. Se uno è "
+              "quel file, dagli %s nell'elenco e rilancia con --lista" % (k, Path(index[k]["file"]).name,
+                                                                          " e ".join(ps), k)
+              for k, ps in sorted(ambiguous.items())]
     taken |= set(keep.values())
     out, changed = [], []
     for line, (sid, sep, path) in zip(lines, planned):
@@ -325,7 +557,7 @@ def keep_known_ids(lines, index):
             changed.append("%s → %s (%s)" % (sid, new, Path(path).name))
         taken.add(new)
         out.append("%s=%s" % (new, path))
-    return out, changed
+    return out, changed, doubts
 
 # ---------------------------------------------------------------- PDF
 
@@ -985,12 +1217,6 @@ def describe(info, units):
     return "%d %s" % (n, names[info["unit"]])
 
 
-def same_file(a, b):
-    """Stesso file sorgente? L'indice può contenere percorsi relativi o assoluti dello stesso file;
-    cartella e nome distinguono modulo1/01_intro.pdf da modulo2/01_intro.pdf."""
-    return source_key(a) == source_key(b)
-
-
 def main():
     for stream in (sys.stdout, sys.stderr):  # console Windows (cp1252) con output su pipe
         if hasattr(stream, "reconfigure"):
@@ -1014,15 +1240,18 @@ def main():
     for k in gone:
         print("• %s: _fonti/%s.md non c'è più, tolto dall'indice" % (k, k))
         del index[k]
+    root = None  # cartella del corso: identifica le fonti con il loro percorso nel corso
     if args.corso:
         if args.lista or args.sources:
             ap.error("--corso prepara da solo l'elenco: non va insieme a --lista o a ID=FILE")
         if not Path(args.corso).is_dir():
             ap.error("--corso: cartella non trovata: %s" % args.corso)
+        root = Path(args.corso)
         lines, notes = scan_course(args.corso)
-        lines, changed = keep_known_ids(lines, index)
+        lines, changed, doubts = keep_known_ids(lines, index, root, out_dir)
         if changed:
             notes.append("ID già usati da fonti estratte prima, nuovi ID: " + "; ".join(changed))
+        notes += doubts
         elenco = Path(args.elenco) if args.elenco else Path(args.out).parent / "elenco.txt"
         elenco.parent.mkdir(parents=True, exist_ok=True)
         elenco.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -1033,7 +1262,11 @@ def main():
         print()
         args.lista = str(elenco)
     if args.lista:
-        for line in Path(args.lista).read_text(encoding="utf-8-sig").splitlines():
+        text = Path(args.lista).read_text(encoding="utf-8-sig")
+        m = re.match(r"# Elenco preparato da extract_sources\.py --corso (.+)", text)
+        if root is None and m:  # un elenco scritto da --corso dice nella prima riga qual è il corso
+            root = Path(m.group(1).strip())
+        for line in text.splitlines():
             if line.strip() and not line.lstrip().startswith("#"):
                 args.sources.append(line.strip())
     if not args.sources:
@@ -1042,6 +1275,12 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     rows, failures = [], 0
     produced, next_t = {}, 1  # ID creati in questo comando; prossimo numero libero per T=
+    # file di questo comando già estratti prima, con il loro ID: la stessa regola dell'elenco di --corso
+    specs = {str(Path(f.strip()).expanduser()): i.strip()[:1] for i, f in (s.split("=", 1) for s in args.sources if "=" in s)
+             if i.strip() != "T"}
+    assigned = assign_known(list(specs), index, root, fonti=out_dir, kinds=specs)
+    owner = {sid: p for p, sid in assigned.items()}
+    seen = {}  # file -> ID in questo comando
     for spec in args.sources:
         if "=" not in spec:
             print("✗ %s: usa il formato ID=FILE" % spec, file=sys.stderr)
@@ -1061,15 +1300,23 @@ def main():
         m = re.match(r"T(\d+)", source_id)
         if m:  # un T= che viene dopo continua la numerazione da qui, anche se questa fonte è già estratta
             next_t = max(next_t, int(m.group(1)) + 1)
-        prev = produced.get(source_id) or (index.get(source_id) or {}).get("file")
-        if source_id != "T" and prev and not same_file(prev, path) and not args.force:
-            print("✗ %s: ID già usato per %s; scegli un altro ID per %s" % (source_id, prev, path.name),
+        rel = course_rel(path, root)
+        prev = produced.get(source_id) or index.get(source_id)
+        taken_by = None
+        if prev and not match_score(prev, path, rel) and assigned.get(str(path)) != source_id:
+            taken_by = prev["file"]
+        elif owner.get(source_id, str(path)) != str(path):  # in questo comando l'ID va a un file più somigliante
+            taken_by = owner[source_id]
+        if source_id != "T" and taken_by and not args.force:
+            print("✗ %s: ID già usato per %s; scegli un altro ID per %s" % (source_id, taken_by, path.name),
                   file=sys.stderr)
             failures += 1
             continue
-        other = next((k for k, v in index.items() if k != source_id and not v.get("diviso")
-                      and same_file(v["file"], path)), None)
-        if source_id != "T" and other:
+        key = rel or os.path.abspath(str(path)).lower()
+        other = assigned.get(str(path)) or seen.get(key)
+        if source_id != "T":
+            seen.setdefault(key, source_id)
+        if source_id != "T" and other and other != source_id:
             # lo stesso file con due ID: le citazioni al vecchio ID resterebbero valide per lo script
             print("✗ %s: %s è già registrato come %s. Per cambiargli ID cancella _fonti/%s.md e rilancia"
                   % (source_id, path.name, other, other), file=sys.stderr)
@@ -1078,6 +1325,17 @@ def main():
         if source_id != "T" and (out_dir / (source_id + ".md")).exists() and not args.force:
             print("• %s: già estratto, saltato (usa --force per rigenerarlo: perderai le aggiunte manuali)"
                   % source_id)
+            entry = index.get(source_id)
+            if entry and entry.get("sha1") and entry["sha1"] != file_sha1(str(path)):
+                print("⚠ %s: %s è cambiato da quando è stato estratto. Se è una versione aggiornata rigeneralo "
+                      "con --force (perderai le aggiunte manuali); se è un'altra fonte dagli un ID nuovo"
+                      % (source_id, path.name))
+            elif entry:  # il corso può essere stato spostato: l'indice segue il file dov'è ora
+                entry["file"] = path.as_posix()
+                if rel:
+                    entry["rel"] = rel
+                if file_sha1(str(path)):
+                    entry["sha1"] = file_sha1(str(path))
             continue
         try:
             if source_id == "T":
@@ -1093,11 +1351,11 @@ def main():
             failures += 1
             continue
         for sid, units, info in found:
-            prev = produced.get(sid) or (index.get(sid) or {}).get("file")
-            if source_id == "T" and prev and not same_file(prev, path) and not args.force:
+            prev = produced.get(sid) or index.get(sid)
+            if source_id == "T" and prev and not match_score(prev, path, rel) and not args.force:
                 print("✗ %s: ID già usato per %s; la lezione %s di %s non è stata estratta (dividi il file "
                       "e dai ID espliciti, per esempio T%02d=...)"
-                      % (sid, prev, info.get("lezione") or sid, path.name, next_t), file=sys.stderr)
+                      % (sid, prev["file"], info.get("lezione") or sid, path.name, next_t), file=sys.stderr)
                 failures += 1
                 continue
             if (out_dir / (sid + ".md")).exists() and not args.force:
@@ -1109,7 +1367,11 @@ def main():
                 failures += 1
                 continue
             low = write_source(out_dir, sid, path, units, info)
-            produced[sid] = info["file"]
+            if rel:
+                info["rel"] = rel
+            if file_sha1(str(path)):
+                info["sha1"] = file_sha1(str(path))
+            produced[sid] = info
             info["labels"] = [u[0] for u in units]
             info["low_text"] = low
             index[sid] = info

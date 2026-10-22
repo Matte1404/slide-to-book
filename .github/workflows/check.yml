@@ -21,4 +21,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install pyyaml pymupdf
+      # con Pillow visual.py compone il provino: un solo ramo della matrice, così si provano tutti e due i casi
+      - run: pip install pillow
+        if: matrix.python == '3.12'
+      # pandoc per provare la conversione in DOCX e HTML di merge_book.py
+      - run: sudo apt-get update && sudo apt-get install -y pandoc
       - run: python evals/smoke_test.py

@@ -51,7 +51,7 @@ Formato: `[ID, posizione]`. Più fonti nella stessa parentesi si separano con `;
 - esame: `[E2023-06, es. 2b]`, oppure `[E2023-06, pag. 3]` se l'esercizio non è numerato
 - altro: `[X01, pag. 4]`
 
-Usa esattamente le posizioni che compaiono nelle intestazioni dei file in `_fonti/`: lo script verifica che ogni slide, pagina, paragrafo o minuto citato esista. Il numero di un esercizio (`es. 2b`) non può verificarlo: controllalo tu sul testo dell'esame. Dentro le parentesi vanno solo ID e posizione: un commento come `[S01, slide 3 per i primi due]` non è una citazione valida, scrivilo fuori. Metti la citazione alla fine della frase o del paragrafo che sostiene, non in fondo al capitolo: serve anche a ritrovare la slide originale mentre si studia. Per gli esercizi scrivi anche, per esteso, nome del file e data dell'appello (formato in `references/chapter-template.md`), perché è quello che lo studente vuole aprire.
+Usa esattamente le posizioni che compaiono nelle intestazioni dei file in `_fonti/`: lo script verifica che ogni slide, pagina, paragrafo o minuto citato esista. Il numero di un esercizio (`es. 2b`) lo confronta solo con il catalogo `esercizi.md`, e senza la lettera della parte: controllalo tu sul testo dell'esame. Dentro le parentesi vanno solo ID e posizione: un commento come `[S01, slide 3 per i primi due]` non è una citazione valida, scrivilo fuori. Metti la citazione alla fine della frase o del paragrafo che sostiene, non in fondo al capitolo: serve anche a ritrovare la slide originale mentre si studia. Per gli esercizi scrivi anche, per esteso, nome del file e data dell'appello (formato in `references/chapter-template.md`), perché è quello che lo studente vuole aprire.
 
 ### Stile
 
@@ -66,7 +66,7 @@ Usa esattamente le posizioni che compaiono nelle intestazioni dei file in `_font
 
 ## Ritmo di lavoro
 
-**Di regola genera tutto senza fermarti.** Chi allega i file con una frase sola ("usa questa skill e fammi il riassunto") vuole la dispensa finita, da rivedere alla fine. Deduci dai file tutto ciò che puoi (tipi, lezioni, date, modalità d'esame). Quando qualcosa è incerto, fai la scelta più ragionevole, annotala tra le "Scelte fatte" di `mappa.md` e riassumila nel messaggio di consegna: così l'utente sa che cosa controllare senza dover rispondere a domande prima di aver visto qualcosa.
+**Di regola genera tutto senza fermarti.** Chi allega i file con una frase sola ("usa questa skill e fammi il riassunto") vuole la dispensa finita, da rivedere alla fine. Nel primo messaggio dichiara però in una riga quanto è grande il lavoro (quante slide e lezioni, quanti capitoli prevedi) e che sarà una dispensa completa, non una sintesi di poche pagine: chi voleva solo un riassunto breve può fermarti, ma tu non aspettare la risposta. Deduci dai file tutto ciò che puoi (tipi, lezioni, date, modalità d'esame). Quando qualcosa è incerto, fai la scelta più ragionevole, annotala tra le "Scelte fatte" di `mappa.md` e riassumila nel messaggio di consegna: così l'utente sa che cosa controllare senza dover rispondere a domande prima di aver visto qualcosa.
 
 Fermati a chiedere solo se senza risposta il lavoro sarebbe inutile: i file non si aprono, non si capisce di che corso si tratta, gli allegati sembrano di corsi diversi. Anche allora, una sola domanda in un solo messaggio.
 

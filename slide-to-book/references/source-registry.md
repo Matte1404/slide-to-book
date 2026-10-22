@@ -33,8 +33,9 @@ Regole:
 - **Audio e video** (`.mp3`, `.m4a`, `.wav`, `.mp4`, ...): non vengono estratti. L'elenco li riporta come "da trascrivere prima": dillo all'utente nel primo messaggio e alla consegna, e prosegui con il resto.
 - **File fuori dalle sottocartelle note** (anche nella cartella principale): riportati come "da classificare". Guardali e, se servono, aggiungili all'elenco con l'ID giusto.
 - Le cartelle `dispensa/`, quelle nascoste e quelle che iniziano con `_` vengono ignorate.
+- **Riprendere il lavoro**: una fonte già estratta si riconosce dal suo percorso dentro la cartella del corso (`modulo1/slide/01_intro.pdf`). Se il corso viene spostato o riallegato in una chat nuova con la stessa struttura, ogni file tiene il suo ID e un file nuovo prende un ID libero. Se lavori un modulo per chat, passa a `--corso` la cartella che contiene `moduloN/`, non quella del modulo: il nome del modulo deve far parte del percorso. Se un file già estratto cambia contenuto, lo script lo segnala e tiene il vecchio testo.
 
-L'elenco finisce in `dispensa/elenco.txt` (o dove dice `--elenco`), con un commento per ogni gruppo che spiega come sono stati scelti gli ID. Per correggere: modifica l'elenco, cancella da `_fonti/` i file degli ID che hai cambiato e rilancia con `--lista dispensa/elenco.txt --force`.
+L'elenco finisce in `dispensa/elenco.txt` (o dove dice `--elenco`), con un commento per ogni gruppo che spiega come sono stati scelti gli ID. Per correggere: modifica l'elenco, cancella da `_fonti/` i file degli ID che hai cambiato e rilancia con `--lista dispensa/elenco.txt`, senza `--force`: lo script estrae solo ciò che manca, mentre `--force` riestrarrebbe tutte le fonti e cancellerebbe le letture visive già aggiunte.
 
 ## Estrazione del testo
 
@@ -57,7 +58,7 @@ Cosa fa:
 - **Markdown** (per esempio una scheda del corso): un paragrafo per sezione, a partire da ogni titolo, mantenendo le righe di tabelle ed elenchi.
 - Scrive `_fonti/_indice.json`, che serve a `check_coverage.py`, e stampa una tabella riassuntiva da usare per il registro.
 
-Per aggiungere file in un secondo momento, rilancia lo script solo con i nuovi file: l'indice si aggiorna. Lo script non sovrascrive un file già estratto, perché potresti averci aggiunto trascrizioni visive. Per rigenerarlo usa `--force`, sapendo che le aggiunte manuali andranno perse e che, se la versione dello script è cambiata, la numerazione di paragrafi e blocchi può cambiare: non rigenerare una fonte già citata nei capitoli. Per cambiare un ID, estrai di nuovo il file con il nuovo ID e cancella il vecchio file da `_fonti/` e dall'indice.
+Per aggiungere file in un secondo momento, rilancia lo script solo con i nuovi file: l'indice si aggiorna. Lo script non sovrascrive un file già estratto, perché potresti averci aggiunto trascrizioni visive. Per rigenerarlo usa `--force`, sapendo che le aggiunte manuali andranno perse e che, se la versione dello script è cambiata, la numerazione di paragrafi e blocchi può cambiare: non rigenerare una fonte già citata nei capitoli. Per cambiare un ID, prima cancella `_fonti/<vecchio ID>.md` (al lancio successivo lo script lo toglie anche dall'indice), poi estrai di nuovo il file con il nuovo ID: finché il vecchio ID è nell'indice, lo script rifiuta lo stesso file con un altro ID.
 
 Dipendenze: per PPTX, DOCX e testo nessuna. Per i PDF basta uno fra `pdftotext` (poppler), PyMuPDF, `pypdf` e `pdfplumber`: lo script usa il primo che trova. Le slide con immagini si segnalano con `pdfimages` (poppler) o PyMuPDF; senza nessuno dei due quella segnalazione manca, e conviene scorrere le slide visivamente. Se non c'è nessun estrattore PDF e non puoi installarne uno, leggi i PDF direttamente e numera tu le pagine (vedi "Solo chat" in SKILL.md).
 

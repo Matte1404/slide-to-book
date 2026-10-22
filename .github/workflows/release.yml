@@ -19,8 +19,9 @@ jobs:
           python-version: "3.12"
       - run: pip install pyyaml pymupdf
       - name: Controlla che il tag corrisponda alla versione
+        # la versione del marketplace, e quella del plugin se c'è, devono essere uguali al tag
         run: |
-          versione=$(python -c 'import json; print(json.load(open(".claude-plugin/marketplace.json"))["metadata"]["version"])')
+          versione=$(python -c 'import json; m = json.load(open(".claude-plugin/marketplace.json")); print(" ".join(sorted({str(m["metadata"]["version"])} | {str(p["version"]) for p in m["plugins"] if "version" in p})))')
           test "${GITHUB_REF_NAME#v}" = "$versione" || { echo "tag $GITHUB_REF_NAME diverso dalla versione $versione"; exit 1; }
       - name: Controlla la skill
         run: python evals/smoke_test.py

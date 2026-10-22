@@ -145,6 +145,7 @@ Regole per gli esercizi:
 - **"Dove l'hai visto" riporta sempre nome del file, data dell'appello e numero dell'esercizio** in chiaro, oltre alla citazione. Lo studente deve poter aprire il file senza consultare il registro.
 - Ogni esercizio del catalogo `esercizi.md` compare con la sua citazione in almeno un capitolo. Se coinvolge più capitoli, mettilo in quello del concetto principale e rimandaci dagli altri.
 - Lo svolgimento completo va dato almeno una volta per tipo e per ogni variante che introduce un passaggio diverso. Con la modalità "scritto con esercizi" svolgi tutti gli esercizi.
+- Se l'esercizio è svolto nelle slide, cita la slide di ogni passo dello svolgimento (`2. Calcoliamo i residui ... [S05, slide 13]`): le citazioni di "Dove l'hai visto" dicono dove trovarlo, ma per il controllo di copertura non spiegano le slide.
 - Il testo dell'esercizio è fedele all'originale. Se una parte è illeggibile, `[DA VERIFICARE]`.
 - Una soluzione scritta da te è sempre `[SOLUZIONE GENERATA]`, anche quando sei sicuro: lo studente deve sapere che non è stata validata dal docente.
 

@@ -12,7 +12,6 @@
       "name": "slide-to-book",
       "description": "Trasforma slide, trascrizioni delle lezioni ed esami passati in una dispensa completa, orientata all'esame e con citazioni verificabili",
       "source": "./",
-      "strict": false,
       "skills": [
         "./slide-to-book"
       ]
